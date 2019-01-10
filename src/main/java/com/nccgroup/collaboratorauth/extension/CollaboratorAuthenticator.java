@@ -1,83 +1,87 @@
-package com.nccgroup.stepper;
+package com.nccgroup.collaboratorauth.extension;
 
 import burp.IBurpExtender;
 import burp.IBurpExtenderCallbacks;
 import burp.IExtensionHelpers;
-import com.coreyd97.BurpExtenderUtilities.DefaultGsonProvider;
-import com.coreyd97.BurpExtenderUtilities.IGsonProvider;
-import com.coreyd97.BurpExtenderUtilities.Preferences;
-import com.google.gson.reflect.TypeToken;
-import com.nccgroup.stepper.ui.StepperUI;
-import com.nccgroup.stepper.ui.VariableReplacementsTabFactory;
+import burp.IExtensionStateListener;
+import com.nccgroup.collaboratorauth.extension.ui.ConfigUI;
 
 import javax.swing.*;
-import java.util.ArrayList;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.util.Map;
 
-public class Stepper implements IBurpExtender {
+public class CollaboratorAuthenticator implements IBurpExtender, IExtensionStateListener {
+
+    public static final String extensionName = "CollaboratorAuth";
 
     //Vars
     public static IBurpExtenderCallbacks callbacks;
     private IExtensionHelpers helpers;
-    private final IGsonProvider gsonProvider;
-    private StepperUI ui;
-    private Preferences prefs;
-    private ArrayList<StepSequence> stepSequences;
+    private ProxyService proxyService;
 
-    public Stepper(){
-        this.gsonProvider = new DefaultGsonProvider();
-        this.gsonProvider.registerTypeAdapter(new TypeToken<StepSequence>(){}.getType(), new StepSequenceSerializer(this));
-        this.gsonProvider.registerTypeAdapter(new TypeToken<Step>(){}.getType(), new StepSerializer());
-        this.gsonProvider.registerTypeAdapter(new TypeToken<StepVariable>(){}.getType(), new StepVariableSerializer());
+    //UI
+    private JPanel ui;
+
+    public CollaboratorAuthenticator(){
+
     }
-
 
     @Override
     public void registerExtenderCallbacks(IBurpExtenderCallbacks callbacks) {
-        Stepper.callbacks = callbacks;
+        CollaboratorAuthenticator.callbacks = callbacks;
         this.helpers = callbacks.getHelpers();
-        this.stepSequences = new ArrayList<>();
-        this.prefs = new Preferences(this.gsonProvider, callbacks);
-        configurePreferences();
 
         SwingUtilities.invokeLater(() -> {
-            ui = new StepperUI(this);
-            Stepper.callbacks.addSuiteTab(Stepper.this.ui);
-            Stepper.callbacks.registerMessageEditorTabFactory(new VariableReplacementsTabFactory(this));
-            Stepper.callbacks.registerContextMenuFactory(new ContextMenuFactory(Stepper.this));
+            CollaboratorAuthenticator.callbacks.addSuiteTab(new ConfigUI(this));
+            CollaboratorAuthenticator.callbacks.registerExtensionStateListener(this);
 
-            addStepSequence(new StepSequence(this));
+            try {
+                startCollaboratorProxy(8081);
+            }catch (IOException | NoSuchAlgorithmException e){
+                e.printStackTrace();
+            }
         });
-
     }
 
-    private void configurePreferences(){
-        //No preferences defined.
-        prefs.addSetting("sequences", String.class);
+    public void startCollaboratorProxy(int port) throws IOException, NoSuchAlgorithmException {
+        //Start the proxy service listening at the given location
+        if(proxyService != null) proxyService.stop();
+        try {
+            proxyService = new ProxyService(this, port, true, true, new URI("https://127.0.0.1:9090"), "ABC");
+        } catch (URISyntaxException e) {
+            e.printStackTrace();
+            return;
+        }
+        try {
+            proxyService.start();
+        } catch (KeyManagementException e) {
+            e.printStackTrace();
+        }
+        System.out.println("Polling Listener Started on Port: " + port);
+        callbacks.printOutput("Polling Listener Started on Port: " + port);
+        String configToSet = "{\"project_options\": {\"misc\": {\"collaborator_server\": " +
+                "{\"polling_location\": \"localhost:" + port + "\"," +
+                "\"poll_over_unencrypted_http\": \"true\"" +
+                "}}}}";
+        callbacks.loadConfigFromJson(configToSet);
     }
 
-    public Preferences getPreferences() {
-        return prefs;
+    public void stopCollaboratorProxy(){
+        if(proxyService != null) {
+            proxyService.stop();
+            proxyService = null;
+            System.out.println("Polling Listener Stopped...");
+            callbacks.printOutput("Polling Listener Stopped...");
+        }
     }
 
-    public StepperUI getUI() {
-        return this.ui;
-    }
-
-    public void addStepSequence(StepSequence sequence){
-        this.ui.addStepSequenceTab(sequence);
-        this.stepSequences.add(sequence);
-    }
-
-    public void removeStepSet(StepSequence stepSequence){
-        this.ui.removeStepSequenceTab(stepSequence);
-        this.stepSequences.remove(stepSequence);
-    }
-
-    public ArrayList<StepSequence> getAllStepSets() {
-        return this.stepSequences;
-    }
-
-    public IGsonProvider getGsonProvider() {
-        return gsonProvider;
+    @Override
+    public void extensionUnloaded() {
+        stopCollaboratorProxy();
     }
 }
