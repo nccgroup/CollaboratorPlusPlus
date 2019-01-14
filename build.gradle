@@ -30,6 +30,10 @@ dependencies {
     testCompile files('/opt/BurpSuitePro/burpsuite_pro-linux.jar')
 }
 
+tasks.withType(Jar) {
+    destinationDir = file("$rootDir/releases")
+}
+
 jar {
     from {
         configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
