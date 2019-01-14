@@ -4,3 +4,4 @@ build/
 out/
 keys/
 *.burp
+CollaboratorServer.properties

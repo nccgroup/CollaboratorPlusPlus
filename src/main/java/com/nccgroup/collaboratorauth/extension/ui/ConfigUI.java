@@ -1,20 +1,37 @@
 package com.nccgroup.collaboratorauth.extension.ui;
 
-import burp.IBurpExtenderCallbacks;
 import burp.ITab;
+import com.coreyd97.BurpExtenderUtilities.PanelBuilder;
 import com.nccgroup.collaboratorauth.extension.CollaboratorAuthenticator;
+import com.nccgroup.collaboratorauth.extension.ProxyService;
+import com.nccgroup.collaboratorauth.extension.ProxyServiceListener;
+import org.apache.http.impl.bootstrap.HttpServer;
 
 import javax.swing.*;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.io.IOException;
-import java.security.NoSuchAlgorithmException;
+import java.net.URISyntaxException;
+import java.util.concurrent.TimeUnit;
 
 public class ConfigUI implements ITab {
 
     private final CollaboratorAuthenticator extension;
     private final JPanel mainPanel;
+    private JToggleButton startStopButton;
+    private JSpinner localPortSpinner;
+    private JSpinner remotePortSpinner;
+    private JTextField remoteAddressField;
+    private JCheckBox sslEnabledCheckbox;
+    private JTextArea secretArea;
+    private JLabel statusLabel;
+
+    private boolean serverStarting = false;
 
     public ConfigUI(CollaboratorAuthenticator extension){
         this.extension = extension;
@@ -22,39 +39,184 @@ public class ConfigUI implements ITab {
     }
 
     public JPanel buildMainPanel(){
-        JPanel mainPanel = new JPanel();
-        JButton startButton = new JButton("Start");
-        startButton.addActionListener((ae) -> {
+
+//                CollaboratorAuthenticator.callbacks.createBurpCollaboratorClientContext().fetchAllCollaboratorInteractions();
+        JPanel mainPanel = new JPanel(new GridBagLayout());
+        mainPanel.addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentShown(ComponentEvent componentEvent) {
+                mainPanel.revalidate();
+                mainPanel.repaint();
+                SwingUtilities.getWindowAncestor(mainPanel).pack();
+            }
+        });
+
+        PanelBuilder panelBuilder = new PanelBuilder(extension.getPreferences());
+        PanelBuilder.ComponentGroup configGroup = panelBuilder.createComponentGroup("Configuration");
+        localPortSpinner = (JSpinner) configGroup.addSetting(CollaboratorAuthenticator.PREF_LOCAL_PORT, "Local Port");
+        ((SpinnerNumberModel) localPortSpinner.getModel()).setMinimum(0);
+        ((SpinnerNumberModel) localPortSpinner.getModel()).setMaximum(65535);
+        localPortSpinner.setEditor(new JSpinner.NumberEditor(localPortSpinner, "#"));
+        remoteAddressField = (JTextField) configGroup.addSetting(CollaboratorAuthenticator.PREF_REMOTE_ADDRESS, "Remote Address");
+        remotePortSpinner = (JSpinner) configGroup.addSetting(CollaboratorAuthenticator.PREF_REMOTE_PORT, "Remote Port");
+        ((SpinnerNumberModel) remotePortSpinner.getModel()).setMinimum(0);
+        ((SpinnerNumberModel) remotePortSpinner.getModel()).setMaximum(65535);
+        remotePortSpinner.setEditor(new JSpinner.NumberEditor(remotePortSpinner, "#"));
+        sslEnabledCheckbox = (JCheckBox) configGroup.addSetting(CollaboratorAuthenticator.PREF_REMOTE_SSL_ENABLED, "Use SSL?");
+
+        secretArea = configGroup.addTextAreaSetting(CollaboratorAuthenticator.PREF_SECRET);
+        secretArea.setLineWrap(true);
+        secretArea.setRows(30);
+        JScrollPane secretScrollPane = new JScrollPane(secretArea);
+        secretScrollPane.setBorder(BorderFactory.createTitledBorder("Shared Secret"));
+//        secretScrollPanePanel.add(new JScrollPane(secretArea), BorderLayout.CENTER);
+
+        //Control Panel
+        PanelBuilder.ComponentGroup controlGroup = panelBuilder.createComponentGroup("Control");
+        statusLabel = new JLabel("Status: Not Running");
+        statusLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        controlGroup.addComponent(statusLabel);
+
+        startStopButton = controlGroup.addToggleButton("Start", actionEvent -> {
+            JToggleButton thisButton = (JToggleButton) actionEvent.getSource();
+            SwingUtilities.invokeLater(() -> {
+                if(thisButton.isSelected()){
+                    startServer();
+                }else{
+                    stopServer();
+                }
+            });
+        });
+
+        try {
+            return panelBuilder.build(new JComponent[][]{
+                    new JComponent[]{null, configGroup, controlGroup, null},
+                    new JComponent[]{null, secretScrollPane, secretScrollPane, null},
+            }, PanelBuilder.Alignment.TOPMIDDLE);
+        } catch (Exception e) {
+            e.printStackTrace();
+            JLabel error = new JLabel("Could not build the panel! :(");
+            JPanel panel = new JPanel();
+            panel.add(error);
+            return panel;
+        }
+    }
+
+    private void startServer(){
+        startStopButton.setText("Starting...");
+        startStopButton.setEnabled(false);
+        serverStarting = true;
+
+        try{
+            extension.startCollaboratorProxy();
+
+            //Check the authentication
+            ProxyServiceListener failListener = new ProxyServiceListener() {
+                @Override
+                public void onFail(String message) {
+                    //Synchronized to stop double error issue.
+                    synchronized (this) {
+                        if(serverStarting) {
+                            onServerStartFailure(message);
+                            if (extension.getProxyService() != null) {
+                                extension.getProxyService().removeProxyServiceListener(this);
+                                extension.stopCollaboratorProxy();
+                            }
+                        }
+                    }
+                }
+
+                @Override
+                public void onSuccess(String message) {
+                    synchronized (this) {
+                        onServerStartSuccess(message);
+                        if (extension.getProxyService() != null) {
+                            extension.getProxyService().removeProxyServiceListener(this);
+                        }
+                    }
+                }
+            };
+
+            extension.getProxyService().addProxyServiceListener(failListener);
+
+            //Wait a 500ms for the server to start,
+            //then trigger a polling request to test authentication...
+            CollaboratorAuthenticator.callbacks.createBurpCollaboratorClientContext().fetchAllCollaboratorInteractions();
+
+        }catch (Exception e){
+            onServerStartFailure("Could not start local server: " + e.getMessage());
+        }
+    }
+
+    private void onServerStartFailure(String message){
+        serverStarting = false;
+        SwingUtilities.invokeLater(() -> {
+            JOptionPane.showMessageDialog(null, message, "Error", JOptionPane.OK_OPTION);
+        });
+
+        startStopButton.setText("Start");
+        startStopButton.setSelected(false);
+        startStopButton.setEnabled(true);
+
+        //Disable all other controls
+        localPortSpinner.setEnabled(true);
+        remoteAddressField.setEnabled(true);
+        remotePortSpinner.setEnabled(true);
+        sslEnabledCheckbox.setEnabled(true);
+        secretArea.setEnabled(true);
+
+        statusLabel.setText("Status: Not Running");
+
+        if(extension.getProxyService() != null)
+            extension.stopCollaboratorProxy();
+    }
+
+    private void onServerStartSuccess(String message){
+        startStopButton.setText("Stop");
+        statusLabel.setText("Status: Listening on port " + localPortSpinner.getValue());
+
+        //Disable all other controls
+        localPortSpinner.setEnabled(false);
+        remoteAddressField.setEnabled(false);
+        remotePortSpinner.setEnabled(false);
+        sslEnabledCheckbox.setEnabled(false);
+        secretArea.setEnabled(false);
+
+        startStopButton.setEnabled(true);
+    }
+
+    private void stopServer(){
+        startStopButton.setText("Stopping...");
+        startStopButton.setEnabled(false);
+        if(extension.getProxyService() != null) {
             try {
-                this.extension.startCollaboratorProxy((int) (8081 + Math.floor(Math.random()*1000)));
-            }catch (IOException | NoSuchAlgorithmException e){
+                extension.stopCollaboratorProxy();
+                if(extension.getProxyService() != null) {
+                    HttpServer proxyserver = extension.getProxyService().getServer();
+                    proxyserver.awaitTermination(10, TimeUnit.SECONDS);
+                }
+                statusLabel.setText("Status: Not Running");
+
+                //Reenable other controls
+                //Disable all other controls
+                localPortSpinner.setEnabled(true);
+                remoteAddressField.setEnabled(true);
+                remotePortSpinner.setEnabled(true);
+                sslEnabledCheckbox.setEnabled(true);
+                secretArea.setEnabled(true);
+
+            } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-        });
-        JButton stopButton = new JButton("Stop");
-        stopButton.addActionListener((ae) -> {
-            this.extension.stopCollaboratorProxy();
-        });
+        }
 
-        JButton breakpointButton = new JButton("BreakPoint");
-        breakpointButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent ae) {
-                System.out.println("BreakPoint");
-                CollaboratorAuthenticator.callbacks.createBurpCollaboratorClientContext().fetchAllCollaboratorInteractions();
-            }
-        });
-
-        mainPanel.add(startButton);
-        mainPanel.add(stopButton);
-        mainPanel.add(breakpointButton);
-
-        return mainPanel;
+        startStopButton.setEnabled(true);
+        startStopButton.setText("Start");
     }
 
     @Override
     public String getTabCaption() {
-        return CollaboratorAuthenticator.extensionName;
+        return CollaboratorAuthenticator.EXTENSION_NAME;
     }
 
     @Override

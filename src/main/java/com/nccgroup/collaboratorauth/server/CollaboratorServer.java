@@ -29,13 +29,14 @@ public class CollaboratorServer {
     private static final String KEYSTORE_KEY_PASSWORD = "keystore_key_password";
 
     private HttpServer server;
+    private Integer listenPort;
 
     private CollaboratorServer(Properties properties) throws IOException, KeyStoreException, CertificateException, NoSuchAlgorithmException, UnrecoverableKeyException, KeyManagementException {
         String actualAddress = properties.getProperty(COLLABORATOR_SERVER_ADDRESS);
         Integer actualPort = Integer.parseInt(properties.getProperty(COLLABORATOR_SERVER_PORT));
         boolean actualIsHttps = Boolean.parseBoolean(properties.getProperty(COLLABORATOR_SERVER_ISHTTPS));
 
-        Integer listenPort = Integer.parseInt(properties.getProperty(LISTEN_PORT));
+        listenPort = Integer.parseInt(properties.getProperty(LISTEN_PORT));
         InetAddress listenAddress = InetAddress.getByName(properties.getProperty(LISTEN_ADDRESS));
         boolean listenSSL = Boolean.parseBoolean(properties.getProperty(LISTEN_SSL));
 
@@ -52,7 +53,6 @@ public class CollaboratorServer {
             String keyPassword = properties.getProperty(KEYSTORE_KEY_PASSWORD);
             SSLContext sslContext = createSSLContext(keystoreFile, storePassword, keyPassword);
             serverBootstrap.setSslContext(sslContext);
-            serverBootstrap.setSslSetupHandler(socket -> socket.setNeedClientAuth(true));
         }
 
         serverBootstrap.setExceptionLogger(ex -> {System.out.println(ex.getMessage()); ex.printStackTrace();});
@@ -63,7 +63,7 @@ public class CollaboratorServer {
     public void start() throws IOException {
         if(server != null) {
             server.start();
-            System.out.println("Server started. Listening for poll requests...");
+            System.out.println("Server started. Listening for poll requests on port " + listenPort + "...");
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 server.shutdown(5, TimeUnit.SECONDS);
             }));

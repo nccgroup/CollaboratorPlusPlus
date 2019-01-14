@@ -30,6 +30,7 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 
 public class ProxyService implements HttpRequestHandler {
@@ -38,13 +39,14 @@ public class ProxyService implements HttpRequestHandler {
     private final int listenPort;
     private final boolean useSsl;
     private final boolean ignoreCertificateErrors;
+    private final ArrayList<ProxyServiceListener> listeners;
 
     private String sessionKey;
     private HttpServer server;
     private URI collaboratorServer;
 
     public ProxyService(CollaboratorAuthenticator authenticator,
-                        int listenPort, boolean useSsl, boolean ignoreCertificateErrors,
+                        Integer listenPort, boolean useSsl, boolean ignoreCertificateErrors,
                         URI collaboratorServer, String sessionKey){
         this.extension = authenticator;
         this.listenPort = listenPort;
@@ -52,9 +54,11 @@ public class ProxyService implements HttpRequestHandler {
         this.ignoreCertificateErrors = ignoreCertificateErrors;
         this.collaboratorServer = collaboratorServer;
         this.sessionKey = sessionKey;
+
+        this.listeners = new ArrayList<>();
     }
 
-    public void start() throws IOException, IllegalStateException, NoSuchAlgorithmException, KeyManagementException {
+    public void start() throws IOException, IllegalStateException {
         if(server != null){
             throw new IllegalStateException();
         }
@@ -64,7 +68,12 @@ public class ProxyService implements HttpRequestHandler {
                                             .setListenerPort(listenPort)
                                             .registerHandler("*", this);
 
-        serverBootstrap.setExceptionLogger(ex -> {System.out.println(ex.getMessage());});
+        serverBootstrap.setExceptionLogger(ex -> {
+//            System.out.println(ex.getMessage());
+            for (ProxyServiceListener listener : this.listeners) {
+                listener.onFail(ex.getMessage());
+            }
+        });
 
 //        SSLContext sslContext = createSSLContext(this.ignoreCertificateErrors);
 //        serverBootstrap.setSslContext(sslContext); //TODO ENABLE SSL SUPPORT
@@ -105,10 +114,10 @@ public class ProxyService implements HttpRequestHandler {
         try {
             actualServerResponse = client.execute(post);
         }catch (ClientProtocolException | SSLHandshakeException e){
-            e.printStackTrace();
+            for (ProxyServiceListener listener : this.listeners) {
+                listener.onFail(e.getMessage());
+            }
             return;
-        }finally {
-            post.releaseConnection();
         }
 
         forwardedResponse.setStatusCode(actualServerResponse.getStatusLine().getStatusCode());
@@ -118,16 +127,37 @@ public class ProxyService implements HttpRequestHandler {
         if (actualServerResponse.getStatusLine().getStatusCode() == 200) {
             String responseString = EntityUtils.toString(actualServerResponse.getEntity());
             forwardedResponseString = responseString;
+
+            for (ProxyServiceListener listener : this.listeners) {
+                listener.onSuccess(forwardedResponseString);
+            }
+
         } else if (actualServerResponse.getStatusLine().getStatusCode() == HttpStatus.SC_UNAUTHORIZED) {
             //Incorrect secret
             forwardedResponseString = "The provided secret is incorrect";
+            for (ProxyServiceListener listener : this.listeners) {
+                listener.onFail(forwardedResponseString);
+            }
         } else {
             forwardedResponseString = "An error occurred on the server.";
+            for (ProxyServiceListener listener : this.listeners) {
+                listener.onFail(forwardedResponseString);
+            }
         }
 
-
-        System.out.println(forwardedResponseString);
         ByteArrayInputStream inputStream = new ByteArrayInputStream(forwardedResponseString.getBytes());
         ((BasicHttpEntity) forwardedResponseEntity).setContent(inputStream);
+    }
+
+    public HttpServer getServer() {
+        return server;
+    }
+
+    public void addProxyServiceListener(ProxyServiceListener proxyServiceListener){
+        this.listeners.add(proxyServiceListener);
+    }
+
+    public void removeProxyServiceListener(ProxyServiceListener proxyServiceListener){
+        this.listeners.remove(proxyServiceListener);
     }
 }
