@@ -119,9 +119,9 @@ public class CollaboratorServer {
         OrderedProperties defaultProperties = new OrderedProperties();
         defaultProperties.setProperty(COLLABORATOR_SERVER_ADDRESS, "127.0.0.1");
         defaultProperties.setProperty(COLLABORATOR_SERVER_PORT, "80");
-        defaultProperties.setProperty(LISTEN_PORT, "8080");
+        defaultProperties.setProperty(LISTEN_PORT, "5050");
         defaultProperties.setProperty(LISTEN_ADDRESS, "0.0.0.0");
-        defaultProperties.setProperty(LISTEN_SSL, "true");
+        defaultProperties.setProperty(LISTEN_SSL, "false");
         defaultProperties.setProperty(KEYSTORE_FILE, "/path/to/java/keystore");
         defaultProperties.setProperty(KEYSTORE_PASSWORD, "KEYSTOREPASSWORD");
         defaultProperties.setProperty(KEYSTORE_KEY_PASSWORD, "KEYSTOREPASSWORD_FOR_KEYS");
