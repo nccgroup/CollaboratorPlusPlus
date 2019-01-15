@@ -107,6 +107,13 @@ public class ConfigUI implements ITab {
         startStopButton.setEnabled(false);
         serverStarting = true;
 
+        //Disable all other controls
+        localPortSpinner.setEnabled(false);
+        remoteAddressField.setEnabled(false);
+        remotePortSpinner.setEnabled(false);
+        sslEnabledCheckbox.setEnabled(false);
+        secretArea.setEnabled(false);
+
         try{
             extension.startCollaboratorProxy();
 
@@ -141,7 +148,9 @@ public class ConfigUI implements ITab {
 
             //Wait a 500ms for the server to start,
             //then trigger a polling request to test authentication...
-            CollaboratorAuthenticator.callbacks.createBurpCollaboratorClientContext().fetchAllCollaboratorInteractions();
+            new Thread(() ->{
+                CollaboratorAuthenticator.callbacks.createBurpCollaboratorClientContext().fetchAllCollaboratorInteractions();
+            }).start();
 
         }catch (Exception e){
             onServerStartFailure("Could not start local server: " + e.getMessage());
@@ -158,7 +167,7 @@ public class ConfigUI implements ITab {
         startStopButton.setSelected(false);
         startStopButton.setEnabled(true);
 
-        //Disable all other controls
+        //Enable all other controls
         localPortSpinner.setEnabled(true);
         remoteAddressField.setEnabled(true);
         remotePortSpinner.setEnabled(true);

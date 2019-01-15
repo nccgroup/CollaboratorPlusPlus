@@ -1,5 +1,6 @@
 package com.nccgroup.collaboratorauth.extension;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.http.*;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
@@ -21,8 +22,7 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLHandshakeException;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
+import java.io.*;
 import java.net.Inet4Address;
 import java.net.URI;
 import java.security.KeyManagementException;
@@ -115,7 +115,8 @@ public class ProxyService implements HttpRequestHandler {
             actualServerResponse = client.execute(post);
         }catch (ClientProtocolException | SSLHandshakeException e){
             for (ProxyServiceListener listener : this.listeners) {
-                listener.onFail(e.getMessage());
+                listener.onFail(e.getMessage() != null ? e.getMessage() :
+                        "SSL exception. Check you're targetting the correct protocol.");
             }
             return;
         }
@@ -139,7 +140,8 @@ public class ProxyService implements HttpRequestHandler {
                 listener.onFail(forwardedResponseString);
             }
         } else {
-            forwardedResponseString = "An error occurred on the server.";
+            String actualResponse = IOUtils.toString(actualServerResponse.getEntity().getContent());
+            forwardedResponseString = "An error occurred on the server.\n" + actualResponse;
             for (ProxyServiceListener listener : this.listeners) {
                 listener.onFail(forwardedResponseString);
             }

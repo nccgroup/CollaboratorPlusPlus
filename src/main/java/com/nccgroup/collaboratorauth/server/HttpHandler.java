@@ -8,6 +8,7 @@ import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.conn.HttpHostConnectException;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicHttpEntityEnclosingRequest;
@@ -34,19 +35,13 @@ public class HttpHandler implements HttpRequestHandler {
 
     @Override
     public void handle(HttpRequest request, HttpResponse response, HttpContext context) throws HttpException, IOException {
-        //Check secret matches and forward request if so.
-//        if(request.getRequestLine().getMethod().equals("GET")){
-//            response.setStatusCode(200);
-//            response.setEntity(new StringEntity("TESTING"));
-//            return;
-//        }
         String requestPostJson = EntityUtils.toString(((BasicHttpEntityEnclosingRequest) request).getEntity());
         JsonObject requestJsonObject;
 
         try {
             requestJsonObject = new JsonParser().parse(requestPostJson).getAsJsonObject();
-            if(requestJsonObject.has("secret") && requestJsonObject.has("request")){
-                if(!requestJsonObject.get("secret").getAsString().equals(this.secret)){
+            if (requestJsonObject.has("secret") && requestJsonObject.has("request")) {
+                if (!requestJsonObject.get("secret").getAsString().equals(this.secret)) {
                     System.out.println("Blocked request with invalid secret: \"" + requestJsonObject.get("secret").getAsString() + "\"");
                     response.setStatusCode(HttpStatus.SC_UNAUTHORIZED);
                     return;
@@ -58,23 +53,27 @@ public class HttpHandler implements HttpRequestHandler {
                 //Make request to actual collaborator server
                 HttpClient client = HttpClients.createDefault();
                 URI getURI = new URI(actualIsHttps ? "https" : "http", "",
-                                        actualAddress, actualPort,
-                                        requestPath, requestQuery, "");
+                        actualAddress, actualPort,
+                        requestPath, requestQuery, "");
                 HttpGet getRequest = new HttpGet(getURI);
                 HttpResponse actualRequestResponse = client.execute(getRequest);
 
                 response.setStatusCode(actualRequestResponse.getStatusLine().getStatusCode());
 
-                if(actualRequestResponse.getStatusLine().getStatusCode() != HttpStatus.SC_OK){
+                if (actualRequestResponse.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
+                    response.setEntity(actualRequestResponse.getEntity());
+                } else {
                     System.err.println("Actual collaborator server returned a " +
                             actualRequestResponse.getStatusLine().getStatusCode() + " response!");
                 }
-
-                response.setEntity(actualRequestResponse.getEntity());
-            }else{
+            } else {
                 response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
             }
+        }catch (HttpHostConnectException e){
+            response.setEntity(new StringEntity("The collaborator auth server could not contact the actual collaborator server!"));
+            response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
         }catch (Exception e){
+            response.setEntity(new StringEntity("The collaborator auth server could not contact the actual collaborator server!"));
             response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
         }
     }
