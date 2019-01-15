@@ -39,8 +39,8 @@ public class CollaboratorAuthenticator implements IBurpExtender, IExtensionState
 
         //Setup preferences
         this.preferences = new Preferences(new DefaultGsonProvider(), callbacks);
-        this.preferences.addSetting(PREF_REMOTE_ADDRESS, String.class, "your.collaborator.server");
-        this.preferences.addSetting(PREF_REMOTE_PORT, Integer.class, 9091);
+        this.preferences.addSetting(PREF_REMOTE_ADDRESS, String.class, "your.collaborator.authenticator.server");
+        this.preferences.addSetting(PREF_REMOTE_PORT, Integer.class, 5050);
         this.preferences.addSetting(PREF_REMOTE_SSL_ENABLED, Boolean.class, true);
 
         this.preferences.addSetting(PREF_LOCAL_PORT, Integer.class, 32541);
