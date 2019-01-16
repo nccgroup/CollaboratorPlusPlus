@@ -11,6 +11,7 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.conn.HttpHostConnectException;
 import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicHttpEntityEnclosingRequest;
 import org.apache.http.protocol.HttpContext;
@@ -56,7 +57,7 @@ public class HttpHandler implements HttpRequestHandler {
                 String requestDecoded = new String(Base64.getDecoder().decode(requestEncoded));
 
                 //Make request to actual collaborator server
-                HttpClient client = HttpClients.createDefault();
+                CloseableHttpClient client = HttpClients.createDefault();
                 URI getURI = new URL((actualIsHttps ? "https://" : "http://") + actualAddress + ":" + actualPort
                          + requestDecoded).toURI();
                 HttpGet getRequest = new HttpGet(getURI);

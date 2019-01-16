@@ -4,13 +4,16 @@ import org.apache.commons.io.IOUtils;
 import org.apache.http.*;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.conn.ssl.AllowAllHostnameVerifier;
 import org.apache.http.conn.ssl.TrustAllStrategy;
 import org.apache.http.entity.BasicHttpEntity;
 import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.NoConnectionReuseStrategy;
 import org.apache.http.impl.bootstrap.HttpServer;
 import org.apache.http.impl.bootstrap.ServerBootstrap;
+import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.protocol.HttpContext;
 import org.apache.http.protocol.HttpRequestHandler;
@@ -65,6 +68,7 @@ public class ProxyService implements HttpRequestHandler {
         }
 
         ServerBootstrap serverBootstrap = ServerBootstrap.bootstrap()
+                                            .setConnectionReuseStrategy(new NoConnectionReuseStrategy())
                                             .setLocalAddress(Inet4Address.getLoopbackAddress())
                                             .setListenerPort(listenPort)
                                             .registerHandler("*", this);
@@ -99,10 +103,11 @@ public class ProxyService implements HttpRequestHandler {
 
     @Override
     public void handle(HttpRequest request, HttpResponse forwardedResponse, HttpContext context) throws HttpException, IOException {
-        HttpClient client = null;
+        CloseableHttpClient client = null;
         try {
             client = HttpClients.custom().setSSLContext(createSSLContext(true))
-                    .setSSLHostnameVerifier(AllowAllHostnameVerifier.INSTANCE).build();
+                    .setSSLHostnameVerifier(AllowAllHostnameVerifier.INSTANCE)
+                    .setConnectionReuseStrategy(new NoConnectionReuseStrategy()).build();
         } catch (NoSuchAlgorithmException | KeyStoreException | KeyManagementException e) {
             for (ProxyServiceListener listener : listeners) {
                 listener.onFail("Could not build HttpClient.");
@@ -110,53 +115,52 @@ public class ProxyService implements HttpRequestHandler {
             e.printStackTrace();
             return;
         }
+
+        //Build request to auth server
         HttpPost post = new HttpPost(collaboratorServer);
         String encodedURI = Base64.getEncoder().encodeToString(request.getRequestLine().getUri().getBytes());
         String postData = "{\"secret\":\"" + this.sessionKey + "\",\"request\":\"" + encodedURI + "\"}";
         post.setEntity(new StringEntity(postData));
 
-        HttpResponse actualServerResponse;
+        HttpResponse actualServerResponse = null;
+
         try {
+            //Make request
             actualServerResponse = client.execute(post);
+            int statusCode = actualServerResponse.getStatusLine().getStatusCode();
+            String responseString = EntityUtils.toString(actualServerResponse.getEntity());
+
+            forwardedResponse.setStatusCode(statusCode);
+
+            if (statusCode == HttpStatus.SC_OK) {
+
+                for (ProxyServiceListener listener : this.listeners) {
+                    listener.onSuccess(responseString);
+                }
+
+            } else if (statusCode == HttpStatus.SC_UNAUTHORIZED) {
+                //Incorrect secret
+                responseString = "The provided secret is incorrect";
+                for (ProxyServiceListener listener : this.listeners) {
+                    listener.onFail(responseString);
+                }
+            } else {
+                responseString = "An error occurred on the server.\n" + responseString;
+                for (ProxyServiceListener listener : this.listeners) {
+                    listener.onFail(responseString);
+                }
+            }
+
+            StringEntity forwardedResponseEntity = new StringEntity(responseString);
+            forwardedResponseEntity.setContentType("application/json");
+            forwardedResponse.setEntity(forwardedResponseEntity);
+
         }catch (ClientProtocolException | SSLHandshakeException e){
             for (ProxyServiceListener listener : this.listeners) {
                 listener.onFail(e.getMessage() != null ? e.getMessage() :
                         "SSL exception. Check you're targetting the correct protocol.");
             }
-            return;
         }
-
-        int statusCode = actualServerResponse.getStatusLine().getStatusCode();
-        forwardedResponse.setStatusCode(statusCode);
-        HttpEntity forwardedResponseEntity = new BasicHttpEntity();
-        String forwardedResponseString = "";
-
-        if (statusCode == HttpStatus.SC_OK) {
-            String responseString = EntityUtils.toString(actualServerResponse.getEntity());
-            forwardedResponseString = responseString;
-
-            for (ProxyServiceListener listener : this.listeners) {
-                listener.onSuccess(forwardedResponseString);
-            }
-
-        } else if (statusCode == HttpStatus.SC_UNAUTHORIZED) {
-            //Incorrect secret
-            forwardedResponseString = "The provided secret is incorrect";
-            for (ProxyServiceListener listener : this.listeners) {
-                listener.onFail(forwardedResponseString);
-            }
-        } else {
-            String actualResponse = IOUtils.toString(actualServerResponse.getEntity().getContent());
-            forwardedResponseString = "An error occurred on the server.\n" + actualResponse;
-            for (ProxyServiceListener listener : this.listeners) {
-                listener.onFail(forwardedResponseString);
-            }
-        }
-
-        ByteArrayInputStream inputStream = new ByteArrayInputStream(forwardedResponseString.getBytes());
-        ((BasicHttpEntity) forwardedResponseEntity).setContent(inputStream);
-        ((BasicHttpEntity) forwardedResponseEntity).setContentType("application/json");
-        forwardedResponse.setEntity(forwardedResponseEntity);
     }
 
     public HttpServer getServer() {

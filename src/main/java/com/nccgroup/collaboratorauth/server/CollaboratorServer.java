@@ -2,6 +2,7 @@ package com.nccgroup.collaboratorauth.server;
 
 import nu.studer.java.util.OrderedProperties;
 import org.apache.http.ExceptionLogger;
+import org.apache.http.impl.NoConnectionReuseStrategy;
 import org.apache.http.impl.bootstrap.HttpServer;
 import org.apache.http.impl.bootstrap.ServerBootstrap;
 import org.apache.http.ssl.SSLContexts;
@@ -43,6 +44,7 @@ public class CollaboratorServer {
         String secret = properties.getProperty(SECRET);
 
         ServerBootstrap serverBootstrap = ServerBootstrap.bootstrap()
+                .setConnectionReuseStrategy(new NoConnectionReuseStrategy())
                 .setListenerPort(listenPort)
                 .setLocalAddress(listenAddress)
                 .registerHandler("*", new HttpHandler(actualAddress, actualPort, actualIsHttps, secret));
