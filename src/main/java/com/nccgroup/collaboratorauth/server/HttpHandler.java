@@ -2,6 +2,7 @@ package com.nccgroup.collaboratorauth.server;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpException;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
@@ -18,6 +19,10 @@ import org.apache.http.util.EntityUtils;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URL;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.util.Base64;
 
 public class HttpHandler implements HttpRequestHandler {
 
@@ -47,21 +52,24 @@ public class HttpHandler implements HttpRequestHandler {
                     return;
                 }
 
-                String requestPath = requestJsonObject.get("request").getAsString().split("\\?", 2)[0];
-                String requestQuery = requestJsonObject.get("request").getAsString().split("\\?", 2)[1];
+                String requestEncoded = requestJsonObject.get("request").getAsString();
+                String requestDecoded = new String(Base64.getDecoder().decode(requestEncoded));
 
                 //Make request to actual collaborator server
                 HttpClient client = HttpClients.createDefault();
-                URI getURI = new URI(actualIsHttps ? "https" : "http", "",
-                        actualAddress, actualPort,
-                        requestPath, requestQuery, "");
+                URI getURI = new URL((actualIsHttps ? "https://" : "http://") + actualAddress + ":" + actualPort
+                         + requestDecoded).toURI();
                 HttpGet getRequest = new HttpGet(getURI);
+
                 HttpResponse actualRequestResponse = client.execute(getRequest);
 
                 response.setStatusCode(actualRequestResponse.getStatusLine().getStatusCode());
 
+                String actualResponse = IOUtils.toString(actualRequestResponse.getEntity().getContent());
+                System.out.println(actualResponse);
+
                 if (actualRequestResponse.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
-                    response.setEntity(actualRequestResponse.getEntity());
+                    response.setEntity(new StringEntity(actualResponse));
                 } else {
                     System.err.println("Actual collaborator server returned a " +
                             actualRequestResponse.getStatusLine().getStatusCode() + " response!");

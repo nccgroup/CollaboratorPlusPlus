@@ -31,6 +31,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.concurrent.TimeUnit;
 
 public class ProxyService implements HttpRequestHandler {
@@ -69,7 +70,7 @@ public class ProxyService implements HttpRequestHandler {
                                             .registerHandler("*", this);
 
         serverBootstrap.setExceptionLogger(ex -> {
-//            System.out.println(ex.getMessage());
+            System.out.println(ex.getMessage());
             for (ProxyServiceListener listener : this.listeners) {
                 listener.onFail(ex.getMessage());
             }
@@ -103,11 +104,15 @@ public class ProxyService implements HttpRequestHandler {
             client = HttpClients.custom().setSSLContext(createSSLContext(true))
                     .setSSLHostnameVerifier(AllowAllHostnameVerifier.INSTANCE).build();
         } catch (NoSuchAlgorithmException | KeyStoreException | KeyManagementException e) {
+            for (ProxyServiceListener listener : listeners) {
+                listener.onFail("Could not build HttpClient.");
+            }
             e.printStackTrace();
             return;
         }
         HttpPost post = new HttpPost(collaboratorServer);
-        String postData = "{\"secret\":\"" + this.sessionKey + "\",\"request\":\"" + request.getRequestLine().getUri() + "\"}";
+        String encodedURI = Base64.getEncoder().encodeToString(request.getRequestLine().getUri().getBytes());
+        String postData = "{\"secret\":\"" + this.sessionKey + "\",\"request\":\"" + encodedURI + "\"}";
         post.setEntity(new StringEntity(postData));
 
         HttpResponse actualServerResponse;
@@ -121,11 +126,12 @@ public class ProxyService implements HttpRequestHandler {
             return;
         }
 
-        forwardedResponse.setStatusCode(actualServerResponse.getStatusLine().getStatusCode());
+        int statusCode = actualServerResponse.getStatusLine().getStatusCode();
+        forwardedResponse.setStatusCode(statusCode);
         HttpEntity forwardedResponseEntity = new BasicHttpEntity();
         String forwardedResponseString = "";
 
-        if (actualServerResponse.getStatusLine().getStatusCode() == 200) {
+        if (statusCode == HttpStatus.SC_OK) {
             String responseString = EntityUtils.toString(actualServerResponse.getEntity());
             forwardedResponseString = responseString;
 
@@ -133,7 +139,7 @@ public class ProxyService implements HttpRequestHandler {
                 listener.onSuccess(forwardedResponseString);
             }
 
-        } else if (actualServerResponse.getStatusLine().getStatusCode() == HttpStatus.SC_UNAUTHORIZED) {
+        } else if (statusCode == HttpStatus.SC_UNAUTHORIZED) {
             //Incorrect secret
             forwardedResponseString = "The provided secret is incorrect";
             for (ProxyServiceListener listener : this.listeners) {
@@ -149,6 +155,8 @@ public class ProxyService implements HttpRequestHandler {
 
         ByteArrayInputStream inputStream = new ByteArrayInputStream(forwardedResponseString.getBytes());
         ((BasicHttpEntity) forwardedResponseEntity).setContent(inputStream);
+        ((BasicHttpEntity) forwardedResponseEntity).setContentType("application/json");
+        forwardedResponse.setEntity(forwardedResponseEntity);
     }
 
     public HttpServer getServer() {
