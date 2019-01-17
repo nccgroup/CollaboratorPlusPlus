@@ -43,6 +43,7 @@ public class HttpHandler implements HttpRequestHandler {
     public void handle(HttpRequest request, HttpResponse response, HttpContext context) throws HttpException, IOException {
         String requestPostJson = EntityUtils.toString(((BasicHttpEntityEnclosingRequest) request).getEntity());
         JsonObject requestJsonObject;
+        CloseableHttpClient client = HttpClients.createDefault();
 
         try {
             requestJsonObject = new JsonParser().parse(requestPostJson).getAsJsonObject();
@@ -57,13 +58,11 @@ public class HttpHandler implements HttpRequestHandler {
                 String requestDecoded = new String(Base64.getDecoder().decode(requestEncoded));
 
                 //Make request to actual collaborator server
-                CloseableHttpClient client = HttpClients.createDefault();
                 URI getURI = new URL((actualIsHttps ? "https://" : "http://") + actualAddress + ":" + actualPort
                          + requestDecoded).toURI();
                 HttpGet getRequest = new HttpGet(getURI);
-
+                getRequest.addHeader("Connection", "close");
                 HttpResponse actualRequestResponse = client.execute(getRequest);
-
                 response.setStatusCode(actualRequestResponse.getStatusLine().getStatusCode());
 
                 String actualResponse = IOUtils.toString(actualRequestResponse.getEntity().getContent());
@@ -84,6 +83,8 @@ public class HttpHandler implements HttpRequestHandler {
         }catch (Exception e){
             response.setEntity(new StringEntity("The collaborator auth server could not contact the actual collaborator server!"));
             response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
+        }finally {
+            client.close();
         }
     }
 }

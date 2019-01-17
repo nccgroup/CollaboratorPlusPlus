@@ -5,6 +5,7 @@ import org.apache.http.*;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.conn.ssl.AllowAllHostnameVerifier;
 import org.apache.http.conn.ssl.TrustAllStrategy;
@@ -107,7 +108,8 @@ public class ProxyService implements HttpRequestHandler {
         try {
             client = HttpClients.custom().setSSLContext(createSSLContext(true))
                     .setSSLHostnameVerifier(AllowAllHostnameVerifier.INSTANCE)
-                    .setConnectionReuseStrategy(new NoConnectionReuseStrategy()).build();
+                    .setConnectionReuseStrategy(new NoConnectionReuseStrategy())
+                    .build();
         } catch (NoSuchAlgorithmException | KeyStoreException | KeyManagementException e) {
             for (ProxyServiceListener listener : listeners) {
                 listener.onFail("Could not build HttpClient.");
@@ -121,6 +123,7 @@ public class ProxyService implements HttpRequestHandler {
         String encodedURI = Base64.getEncoder().encodeToString(request.getRequestLine().getUri().getBytes());
         String postData = "{\"secret\":\"" + this.sessionKey + "\",\"request\":\"" + encodedURI + "\"}";
         post.setEntity(new StringEntity(postData));
+        post.addHeader("Connection", "close");
 
         HttpResponse actualServerResponse = null;
 
@@ -160,6 +163,8 @@ public class ProxyService implements HttpRequestHandler {
                 listener.onFail(e.getMessage() != null ? e.getMessage() :
                         "SSL exception. Check you're targetting the correct protocol.");
             }
+        }finally {
+            client.close();
         }
     }
 
