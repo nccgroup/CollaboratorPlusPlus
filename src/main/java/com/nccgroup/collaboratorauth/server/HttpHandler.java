@@ -7,7 +7,6 @@ import org.apache.http.HttpException;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
-import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.conn.HttpHostConnectException;
 import org.apache.http.entity.StringEntity;
@@ -21,8 +20,6 @@ import org.apache.http.util.EntityUtils;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URL;
-import java.net.URLDecoder;
-import java.net.URLEncoder;
 import java.util.Base64;
 
 public class HttpHandler implements HttpRequestHandler {
@@ -66,7 +63,6 @@ public class HttpHandler implements HttpRequestHandler {
                 response.setStatusCode(actualRequestResponse.getStatusLine().getStatusCode());
 
                 String actualResponse = IOUtils.toString(actualRequestResponse.getEntity().getContent());
-                System.out.println(actualResponse);
 
                 if (actualRequestResponse.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
                     response.setEntity(new StringEntity(actualResponse));

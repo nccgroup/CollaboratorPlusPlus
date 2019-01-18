@@ -75,7 +75,7 @@ public class ProxyService implements HttpRequestHandler {
                                             .registerHandler("*", this);
 
         serverBootstrap.setExceptionLogger(ex -> {
-            System.out.println(ex.getMessage());
+//            System.out.println(ex.getMessage());
             for (ProxyServiceListener listener : this.listeners) {
                 listener.onFail(ex.getMessage());
             }

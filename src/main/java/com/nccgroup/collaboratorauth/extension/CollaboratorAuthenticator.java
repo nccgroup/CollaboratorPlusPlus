@@ -22,6 +22,9 @@ public class CollaboratorAuthenticator implements IBurpExtender, IExtensionState
     public static final String PREF_REMOTE_SSL_ENABLED = "remoteSSLEnabled";
     public static final String PREF_LOCAL_PORT = "localPort";
     public static final String PREF_SECRET = "sharedSecret";
+    public static final String PREF_ORIGINAL_POLL_SETTINGS = "origPollSettings";
+    public static final String POLL_LOCATION_CONFIG_PATH = "project_options.misc.collaborator_server.polling_location";
+    public static final String POLL_SSL_CONFIG_PATH = "project_options.misc.collaborator_server.poll_over_unencrypted_http";
 
     //Vars
     public static IBurpExtenderCallbacks callbacks;
@@ -45,6 +48,8 @@ public class CollaboratorAuthenticator implements IBurpExtender, IExtensionState
 
         this.preferences.addSetting(PREF_LOCAL_PORT, Integer.class, 32541);
         this.preferences.addSetting(PREF_SECRET, String.class, "Your Secret String");
+
+        this.preferences.addSetting(PREF_ORIGINAL_POLL_SETTINGS, String.class, "");
 
         SwingUtilities.invokeLater(() -> {
             CollaboratorAuthenticator.callbacks.addSuiteTab(new ConfigUI(this));
@@ -74,6 +79,7 @@ public class CollaboratorAuthenticator implements IBurpExtender, IExtensionState
 
 //        System.out.println("Polling Listener Started on Port: " + listenPort);
         callbacks.printOutput("Polling Listener Started on Port: " + listenPort);
+        saveCollaboratorConfig();
         callbacks.loadConfigFromJson(buildConfig(listenPort));
     }
 
@@ -84,10 +90,21 @@ public class CollaboratorAuthenticator implements IBurpExtender, IExtensionState
             //System.out.println("Polling Listener Stopped...");
             callbacks.printOutput("Polling Listener Stopped...");
         }
+        restoreCollaboratorConfig();
     }
 
     public ProxyService getProxyService() {
         return proxyService;
+    }
+
+    private void saveCollaboratorConfig(){
+        String config = callbacks.saveConfigAsJson(POLL_LOCATION_CONFIG_PATH, POLL_SSL_CONFIG_PATH);
+        this.preferences.setSetting(PREF_ORIGINAL_POLL_SETTINGS, config);
+    }
+
+    private void restoreCollaboratorConfig(){
+        String config = (String) this.preferences.getSetting(PREF_ORIGINAL_POLL_SETTINGS);
+        callbacks.loadConfigFromJson(config);
     }
 
     private String buildConfig(int listenPort){
