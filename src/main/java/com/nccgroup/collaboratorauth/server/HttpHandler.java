@@ -3,10 +3,7 @@ package com.nccgroup.collaboratorauth.server;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.apache.commons.io.IOUtils;
-import org.apache.http.HttpException;
-import org.apache.http.HttpRequest;
-import org.apache.http.HttpResponse;
-import org.apache.http.HttpStatus;
+import org.apache.http.*;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.conn.HttpHostConnectException;
 import org.apache.http.entity.StringEntity;
@@ -63,6 +60,13 @@ public class HttpHandler implements HttpRequestHandler {
                 response.setStatusCode(actualRequestResponse.getStatusLine().getStatusCode());
 
                 String actualResponse = IOUtils.toString(actualRequestResponse.getEntity().getContent());
+
+                for (Header header : actualRequestResponse.getAllHeaders()) {
+                    if(header.getName().equalsIgnoreCase("X-Collaborator-Version")
+                            || header.getName().equalsIgnoreCase("X-Collaborator-Time")){
+                        response.addHeader(header);
+                    }
+                }
 
                 if (actualRequestResponse.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
                     response.setEntity(new StringEntity(actualResponse));

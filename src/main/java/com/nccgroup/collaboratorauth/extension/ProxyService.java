@@ -141,6 +141,13 @@ public class ProxyService implements HttpRequestHandler {
                     listener.onSuccess(responseString);
                 }
 
+                for (Header header : actualServerResponse.getAllHeaders()) {
+                    if(header.getName().equalsIgnoreCase("X-Collaborator-Version")
+                            || header.getName().equalsIgnoreCase("X-Collaborator-Time")){
+                        forwardedResponse.addHeader(header);
+                    }
+                }
+
             } else if (statusCode == HttpStatus.SC_UNAUTHORIZED) {
                 //Incorrect secret
                 responseString = "The provided secret is incorrect";
