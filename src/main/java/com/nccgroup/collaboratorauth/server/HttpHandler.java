@@ -25,16 +25,23 @@ public class HttpHandler implements HttpRequestHandler {
     private final Integer actualPort;
     private final boolean actualIsHttps;
     private final String secret;
+    private final String logLevel;
 
-    public HttpHandler(String actualAddress, Integer actualPort, boolean actualIsHttps, String secret){
+    public HttpHandler(String actualAddress, Integer actualPort, boolean actualIsHttps, String secret, String logLevel){
         this.actualAddress = actualAddress;
         this.actualPort = actualPort;
         this.actualIsHttps = actualIsHttps;
         this.secret = secret;
+        this.logLevel = logLevel;
     }
 
     @Override
     public void handle(HttpRequest request, HttpResponse response, HttpContext context) throws HttpException, IOException {
+        if(!(request instanceof BasicHttpEntityEnclosingRequest)){
+            response.setEntity(new StringEntity("Request was not an instance of BasicHttpEntityEnclosingRequest."));
+            response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
+            return;
+        }
         String requestPostJson = EntityUtils.toString(((BasicHttpEntityEnclosingRequest) request).getEntity());
         JsonObject requestJsonObject;
         CloseableHttpClient client = HttpClients.createDefault();
@@ -43,7 +50,8 @@ public class HttpHandler implements HttpRequestHandler {
             requestJsonObject = new JsonParser().parse(requestPostJson).getAsJsonObject();
             if (requestJsonObject.has("secret") && requestJsonObject.has("request")) {
                 if (!requestJsonObject.get("secret").getAsString().equals(this.secret)) {
-                    System.out.println("Blocked request with invalid secret: \"" + requestJsonObject.get("secret").getAsString() + "\"");
+                    if(logLevel.equalsIgnoreCase("debug") || logLevel.equalsIgnoreCase("info") || logLevel.equalsIgnoreCase("error"))
+                        System.out.println("Blocked request with invalid secret: \"" + requestJsonObject.get("secret").getAsString() + "\"");
                     response.setStatusCode(HttpStatus.SC_UNAUTHORIZED);
                     return;
                 }
@@ -71,7 +79,8 @@ public class HttpHandler implements HttpRequestHandler {
                 if (actualRequestResponse.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
                     response.setEntity(new StringEntity(actualResponse));
                 } else {
-                    System.err.println("Actual collaborator server returned a " +
+                    if(logLevel.equalsIgnoreCase("debug") || logLevel.equalsIgnoreCase("error"))
+                        System.err.println("Actual collaborator server returned a " +
                             actualRequestResponse.getStatusLine().getStatusCode() + " response!");
                 }
             } else {

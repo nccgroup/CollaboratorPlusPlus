@@ -28,9 +28,11 @@ public class CollaboratorServer {
     private static final String KEYSTORE_FILE = "keystore_file";
     private static final String KEYSTORE_PASSWORD = "keystore_password";
     private static final String KEYSTORE_KEY_PASSWORD = "keystore_key_password";
+    private static final String LOG_LEVEL = "log_level";
 
     private HttpServer server;
     private Integer listenPort;
+    private String logLevel;
 
     private CollaboratorServer(Properties properties) throws IOException, KeyStoreException, CertificateException, NoSuchAlgorithmException, UnrecoverableKeyException, KeyManagementException {
         String actualAddress = properties.getProperty(COLLABORATOR_SERVER_ADDRESS);
@@ -40,6 +42,7 @@ public class CollaboratorServer {
         listenPort = Integer.parseInt(properties.getProperty(LISTEN_PORT));
         InetAddress listenAddress = InetAddress.getByName(properties.getProperty(LISTEN_ADDRESS));
         boolean listenSSL = Boolean.parseBoolean(properties.getProperty(LISTEN_SSL));
+        logLevel = properties.getProperty(LOG_LEVEL);
 
         String secret = properties.getProperty(SECRET);
 
@@ -47,7 +50,7 @@ public class CollaboratorServer {
                 .setConnectionReuseStrategy(new NoConnectionReuseStrategy())
                 .setListenerPort(listenPort)
                 .setLocalAddress(listenAddress)
-                .registerHandler("*", new HttpHandler(actualAddress, actualPort, actualIsHttps, secret));
+                .registerHandler("*", new HttpHandler(actualAddress, actualPort, actualIsHttps, secret, logLevel));
 
         if(listenSSL){
             File keystoreFile = new File(properties.getProperty(KEYSTORE_FILE));
@@ -57,7 +60,8 @@ public class CollaboratorServer {
             serverBootstrap.setSslContext(sslContext);
         }
 
-        serverBootstrap.setExceptionLogger(ex -> {System.out.println(ex.getMessage()); ex.printStackTrace();});
+        if(logLevel.equalsIgnoreCase("debug") || logLevel.equalsIgnoreCase("error"))
+            serverBootstrap.setExceptionLogger(ex -> {System.out.println(ex.getMessage()); ex.printStackTrace();});
 
         server = serverBootstrap.create();
     }
@@ -128,6 +132,7 @@ public class CollaboratorServer {
         defaultProperties.setProperty(KEYSTORE_PASSWORD, "KEYSTOREPASSWORD");
         defaultProperties.setProperty(KEYSTORE_KEY_PASSWORD, "KEYSTOREPASSWORD_FOR_KEYS");
         defaultProperties.setProperty(SECRET, "CHANGE_ME");
+        defaultProperties.setProperty(LOG_LEVEL, "INFO");
 
         return defaultProperties;
     }

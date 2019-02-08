@@ -1,5 +1,5 @@
 group 'nccgroup'
-version '1.0-SNAPSHOT'
+version '0.1-Beta'
 
 apply plugin: 'java'
 apply plugin: 'maven'
@@ -28,25 +28,18 @@ dependencies {
     compile group: 'org.apache.httpcomponents', name: 'httpclient', version: '4.5.6'
     compile group: 'commons-io', name: 'commons-io', version: '2.4'
     compile group: 'nu.studer', name: 'java-ordered-properties', version: '1.0.1'
-    testCompile files('/opt/BurpSuitePro/burpsuite_pro-linux.jar')
+    testCompile files('/opt/BurpSuitePro/burpsuite_pro_v2.0.14beta.jar')
 }
 
 tasks.withType(Jar) {
     destinationDir = file("$rootDir/releases")
 }
 
-jar {
-    manifest {
-        attributes(
-                "Class-Path": configurations.compile.collect { it.getName() }.join(' '),
-                "Main-Class": "com.nccgroup.collaboratorauth.server.CollaboratorServer"
-        )
-    }
-}
-
 task fatJar(type: Jar) {
     manifest {
-        attributes 'Main-Class': 'com.nccgroup.collaboratorauth.server.CollaboratorServer'
+        attributes (
+                'Main-Class': 'com.nccgroup.collaboratorauth.server.CollaboratorServer'
+        )
     }
     from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
     with jar
