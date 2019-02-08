@@ -74,6 +74,17 @@ public class CollaboratorAuthenticator implements IBurpExtender, IExtensionState
         if(proxyService != null) proxyService.stop();
 
         proxyService = new ProxyService(this, listenPort, true, true, destinationURI, secret);
+        proxyService.addProxyServiceListener(new ProxyServiceListener() {
+            @Override
+            public void onFail(String message) {
+                callbacks.printError(message);
+            }
+
+            @Override
+            public void onSuccess(String message) {
+                callbacks.printOutput(message);
+            }
+        });
 
         proxyService.start();
 
