@@ -19,7 +19,7 @@
 *Note: To allow HTTP and HTTPS requests to the Collaborator Auth server, create two copies of the configuration file, 
 configuring one for HTTP and one for HTTPS and run two instances of the Collaborator Auth server.*
 
-#### Optional: Generate the KeyStore from certificate and private key
+#### Optional: Generate the KeyStore from certificate and private key to enable polling over HTTPS
 
 1) `openssl pkcs12 -export -in certificate.crt -inkey private.key -out polling.domain.p12 -name polling`
 2) Enter a password to use for the key.
