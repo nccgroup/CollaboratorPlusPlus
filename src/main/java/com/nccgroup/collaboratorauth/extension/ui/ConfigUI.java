@@ -3,20 +3,13 @@ package com.nccgroup.collaboratorauth.extension.ui;
 import burp.ITab;
 import com.coreyd97.BurpExtenderUtilities.PanelBuilder;
 import com.nccgroup.collaboratorauth.extension.CollaboratorAuthenticator;
-import com.nccgroup.collaboratorauth.extension.ProxyService;
 import com.nccgroup.collaboratorauth.extension.ProxyServiceListener;
 import org.apache.http.impl.bootstrap.HttpServer;
 
 import javax.swing.*;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
-import java.io.IOException;
-import java.net.URISyntaxException;
 import java.util.concurrent.TimeUnit;
 
 public class ConfigUI implements ITab {
@@ -27,6 +20,7 @@ public class ConfigUI implements ITab {
     private JSpinner localPortSpinner;
     private JSpinner remotePortSpinner;
     private JTextField remoteAddressField;
+    private JTextField collaboratorLocationField;
     private JCheckBox sslEnabledCheckbox;
     private JTextArea secretArea;
     private JLabel statusLabel;
@@ -57,8 +51,9 @@ public class ConfigUI implements ITab {
         ((SpinnerNumberModel) localPortSpinner.getModel()).setMinimum(0);
         ((SpinnerNumberModel) localPortSpinner.getModel()).setMaximum(65535);
         localPortSpinner.setEditor(new JSpinner.NumberEditor(localPortSpinner, "#"));
-        remoteAddressField = (JTextField) configGroup.addSetting(CollaboratorAuthenticator.PREF_REMOTE_ADDRESS, "Remote Address");
-        remotePortSpinner = (JSpinner) configGroup.addSetting(CollaboratorAuthenticator.PREF_REMOTE_PORT, "Remote Port");
+        collaboratorLocationField = (JTextField) configGroup.addSetting(CollaboratorAuthenticator.PREF_COLLABORATOR_ADDRESS, "Collaborator Location");
+        remoteAddressField = (JTextField) configGroup.addSetting(CollaboratorAuthenticator.PREF_POLLING_ADDRESS, "Collaborator Polling Location");
+        remotePortSpinner = (JSpinner) configGroup.addSetting(CollaboratorAuthenticator.PREF_POLLING_PORT, "Collaborator Auth Port");
         ((SpinnerNumberModel) remotePortSpinner.getModel()).setMinimum(0);
         ((SpinnerNumberModel) remotePortSpinner.getModel()).setMaximum(65535);
         remotePortSpinner.setEditor(new JSpinner.NumberEditor(remotePortSpinner, "#"));
@@ -109,6 +104,7 @@ public class ConfigUI implements ITab {
 
         //Disable all other controls
         localPortSpinner.setEnabled(false);
+        collaboratorLocationField.setEnabled(false);
         remoteAddressField.setEnabled(false);
         remotePortSpinner.setEnabled(false);
         sslEnabledCheckbox.setEnabled(false);
@@ -169,6 +165,7 @@ public class ConfigUI implements ITab {
 
         //Enable all other controls
         localPortSpinner.setEnabled(true);
+        collaboratorLocationField.setEnabled(true);
         remoteAddressField.setEnabled(true);
         remotePortSpinner.setEnabled(true);
         sslEnabledCheckbox.setEnabled(true);
@@ -186,6 +183,7 @@ public class ConfigUI implements ITab {
 
         //Disable all other controls
         localPortSpinner.setEnabled(false);
+        collaboratorLocationField.setEnabled(false);
         remoteAddressField.setEnabled(false);
         remotePortSpinner.setEnabled(false);
         sslEnabledCheckbox.setEnabled(false);
@@ -209,6 +207,7 @@ public class ConfigUI implements ITab {
                 //Reenable other controls
                 //Disable all other controls
                 localPortSpinner.setEnabled(true);
+                collaboratorLocationField.setEnabled(true);
                 remoteAddressField.setEnabled(true);
                 remotePortSpinner.setEnabled(true);
                 sslEnabledCheckbox.setEnabled(true);

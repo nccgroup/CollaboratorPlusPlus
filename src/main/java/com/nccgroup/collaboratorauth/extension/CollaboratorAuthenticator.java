@@ -17,14 +17,14 @@ import java.net.URISyntaxException;
 public class CollaboratorAuthenticator implements IBurpExtender, IExtensionStateListener {
 
     public static final String EXTENSION_NAME = "CollaboratorAuth";
-    public static final String PREF_REMOTE_ADDRESS = "remoteAddress";
-    public static final String PREF_REMOTE_PORT = "remotePort";
+    public static final String PREF_COLLABORATOR_ADDRESS = "collaboratorAddress";
+    public static final String PREF_POLLING_ADDRESS = "pollingAddress";
+    public static final String PREF_POLLING_PORT = "remotePort";
     public static final String PREF_REMOTE_SSL_ENABLED = "remoteSSLEnabled";
     public static final String PREF_LOCAL_PORT = "localPort";
     public static final String PREF_SECRET = "sharedSecret";
-    public static final String PREF_ORIGINAL_POLL_SETTINGS = "origPollSettings";
-    public static final String POLL_LOCATION_CONFIG_PATH = "project_options.misc.collaborator_server.polling_location";
-    public static final String POLL_SSL_CONFIG_PATH = "project_options.misc.collaborator_server.poll_over_unencrypted_http";
+    public static final String PREF_ORIGINAL_COLLABORATOR_SETTINGS = "origPollSettings";
+    public static final String COLLABORATOR_SERVER_CONFIG_PATH = "project_options.misc.collaborator_server";
 
     //Vars
     public static IBurpExtenderCallbacks callbacks;
@@ -42,14 +42,15 @@ public class CollaboratorAuthenticator implements IBurpExtender, IExtensionState
 
         //Setup preferences
         this.preferences = new Preferences(new DefaultGsonProvider(), callbacks);
-        this.preferences.addSetting(PREF_REMOTE_ADDRESS, String.class, "your.collaborator.authenticator.server");
-        this.preferences.addSetting(PREF_REMOTE_PORT, Integer.class, 5050);
+        this.preferences.addSetting(PREF_COLLABORATOR_ADDRESS, String.class, "your.private.collaborator.instance");
+        this.preferences.addSetting(PREF_POLLING_ADDRESS, String.class, "your.collaborator.authenticator.server");
+        this.preferences.addSetting(PREF_POLLING_PORT, Integer.class, 5050);
         this.preferences.addSetting(PREF_REMOTE_SSL_ENABLED, Boolean.class, true);
 
         this.preferences.addSetting(PREF_LOCAL_PORT, Integer.class, 32541);
         this.preferences.addSetting(PREF_SECRET, String.class, "Your Secret String");
 
-        this.preferences.addSetting(PREF_ORIGINAL_POLL_SETTINGS, String.class, "");
+        this.preferences.addSetting(PREF_ORIGINAL_COLLABORATOR_SETTINGS, String.class, "");
 
         SwingUtilities.invokeLater(() -> {
             CollaboratorAuthenticator.callbacks.addSuiteTab(new ConfigUI(this));
@@ -62,7 +63,7 @@ public class CollaboratorAuthenticator implements IBurpExtender, IExtensionState
 
 
         URI destination = new URI(ssl ? "https" : "http", null,
-                (String) this.preferences.getSetting(PREF_REMOTE_ADDRESS), (Integer) this.preferences.getSetting(PREF_REMOTE_PORT),
+                (String) this.preferences.getSetting(PREF_POLLING_ADDRESS), (Integer) this.preferences.getSetting(PREF_POLLING_PORT),
                 null, null, null);
 
         startCollaboratorProxy((Integer) this.preferences.getSetting(PREF_LOCAL_PORT), destination,
@@ -109,19 +110,21 @@ public class CollaboratorAuthenticator implements IBurpExtender, IExtensionState
     }
 
     private void saveCollaboratorConfig(){
-        String config = callbacks.saveConfigAsJson(POLL_LOCATION_CONFIG_PATH, POLL_SSL_CONFIG_PATH);
-        this.preferences.setSetting(PREF_ORIGINAL_POLL_SETTINGS, config);
+        String config = callbacks.saveConfigAsJson(COLLABORATOR_SERVER_CONFIG_PATH);
+        this.preferences.setSetting(PREF_ORIGINAL_COLLABORATOR_SETTINGS, config);
     }
 
     private void restoreCollaboratorConfig(){
-        String config = (String) this.preferences.getSetting(PREF_ORIGINAL_POLL_SETTINGS);
+        String config = (String) this.preferences.getSetting(PREF_ORIGINAL_COLLABORATOR_SETTINGS);
         callbacks.loadConfigFromJson(config);
     }
 
     private String buildConfig(int listenPort){
         return "{\"project_options\": {\"misc\": {\"collaborator_server\": " +
-                "{\"polling_location\": \"" + Inet4Address.getLoopbackAddress().getHostName() + ":" + listenPort + "\"," +
-                "\"poll_over_unencrypted_http\": \"true\"" +
+                "{\"location\": \"" + this.preferences.getSetting(PREF_COLLABORATOR_ADDRESS) + "\"," +
+                "\"polling_location\": \"" + Inet4Address.getLoopbackAddress().getHostName() + ":" + listenPort + "\"," +
+                "\"poll_over_unencrypted_http\": \"true\"," +
+                "\"type\": \"private\"" +
                 "}}}}";
     }
 
