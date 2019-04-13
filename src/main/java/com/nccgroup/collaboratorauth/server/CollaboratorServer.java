@@ -1,23 +1,31 @@
 package com.nccgroup.collaboratorauth.server;
 
 import nu.studer.java.util.OrderedProperties;
-import org.apache.http.ExceptionLogger;
 import org.apache.http.impl.NoConnectionReuseStrategy;
 import org.apache.http.impl.bootstrap.HttpServer;
 import org.apache.http.impl.bootstrap.ServerBootstrap;
 import org.apache.http.ssl.SSLContexts;
+import org.bouncycastle.jce.provider.PEMUtil;
+import org.bouncycastle.util.io.pem.PemObject;
+import org.bouncycastle.util.io.pem.PemReader;
 
-import javax.net.ssl.*;
+import javax.net.ssl.SSLContext;
 import java.io.*;
 import java.net.InetAddress;
 import java.nio.file.Files;
-import java.security.*;
-import java.security.cert.CertificateException;
+import java.nio.file.Paths;
+import java.security.KeyFactory;
+import java.security.KeyStore;
+import java.security.PrivateKey;
+import java.security.cert.Certificate;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.util.ArrayList;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 public class CollaboratorServer {
 
+    private static final String DEFAULT_KEYSTORE_PASSWORD = "changeit";
     private static final String COLLABORATOR_SERVER_ADDRESS = "collaborator_server_address";
     private static final String COLLABORATOR_SERVER_PORT = "collaborator_server_port";
     private static final String COLLABORATOR_SERVER_ISHTTPS = "collaborator_server_ishttps";
@@ -25,6 +33,10 @@ public class CollaboratorServer {
     private static final String LISTEN_PORT = "listen_port";
     private static final String LISTEN_ADDRESS = "listen_address";
     private static final String LISTEN_SSL = "listen_ssl";
+    private static final String PRIVATE_KEY_PATH = "ssl_private_key_path";
+    private static final String CERTIFICATE_PATH = "ssl_certificate_path";
+    private static final String INTERMEDIATE_CERTIFICATE_PATH = "ssl_intermediate_certificate_path";
+    private static final String INTERMEDIATE_CERTIFICATE_DEFAULT = "/certs/intermediate.crt";
     private static final String KEYSTORE_FILE = "keystore_file";
     private static final String KEYSTORE_PASSWORD = "keystore_password";
     private static final String KEYSTORE_KEY_PASSWORD = "keystore_key_password";
@@ -34,7 +46,7 @@ public class CollaboratorServer {
     private Integer listenPort;
     private String logLevel;
 
-    private CollaboratorServer(Properties properties) throws IOException, KeyStoreException, CertificateException, NoSuchAlgorithmException, UnrecoverableKeyException, KeyManagementException {
+    private CollaboratorServer(Properties properties) throws Exception {
         String actualAddress = properties.getProperty(COLLABORATOR_SERVER_ADDRESS);
         Integer actualPort = Integer.parseInt(properties.getProperty(COLLABORATOR_SERVER_PORT));
         boolean actualIsHttps = Boolean.parseBoolean(properties.getProperty(COLLABORATOR_SERVER_ISHTTPS));
@@ -53,10 +65,34 @@ public class CollaboratorServer {
                 .registerHandler("*", new HttpHandler(actualAddress, actualPort, actualIsHttps, secret, logLevel));
 
         if(listenSSL){
-            File keystoreFile = new File(properties.getProperty(KEYSTORE_FILE));
-            String storePassword = properties.getProperty(KEYSTORE_PASSWORD);
-            String keyPassword = properties.getProperty(KEYSTORE_KEY_PASSWORD);
-            SSLContext sslContext = createSSLContext(keystoreFile, storePassword, keyPassword);
+            SSLContext sslContext;
+            if(!properties.getProperty(PRIVATE_KEY_PATH).equals("")){
+                //Load private key
+                PrivateKey privateKey = Utilities.loadPrivateKeyFromFile(properties.getProperty(PRIVATE_KEY_PATH));
+
+                ArrayList<Certificate> certificateList = new ArrayList<>();
+                //Load certificate
+                certificateList.add(Utilities.loadCertificateFromFile(properties.getProperty(CERTIFICATE_PATH)));
+                //Load intermediate certificate
+                String intermediatePath = properties.getProperty(INTERMEDIATE_CERTIFICATE_PATH);
+                if(!intermediatePath.equals("") && !intermediatePath.equals(INTERMEDIATE_CERTIFICATE_DEFAULT)){
+                    certificateList.add(Utilities.loadCertificateFromFile(properties.getProperty(intermediatePath)));
+                }
+                Certificate[] certificateChain = certificateList.toArray(new Certificate[0]);
+
+                //Create new keystore
+                KeyStore keyStore = KeyStore.getInstance("JKS");
+                keyStore.load(null, DEFAULT_KEYSTORE_PASSWORD.toCharArray());
+                keyStore.setKeyEntry("collaboratorAuth", privateKey,
+                        DEFAULT_KEYSTORE_PASSWORD.toCharArray(), certificateChain);
+//                keyStore.
+                sslContext = createSSLContext(keyStore, DEFAULT_KEYSTORE_PASSWORD.toCharArray());
+            }else {
+                File keystoreFile = new File(properties.getProperty(KEYSTORE_FILE));
+                String storePassword = properties.getProperty(KEYSTORE_PASSWORD);
+                String keyPassword = properties.getProperty(KEYSTORE_KEY_PASSWORD);
+                sslContext = createSSLContext(keystoreFile, storePassword, keyPassword);
+            }
             serverBootstrap.setSslContext(sslContext);
         }
 
@@ -76,11 +112,16 @@ public class CollaboratorServer {
         }
     }
 
-    private SSLContext createSSLContext(final File keyStoreFile, final String storePassword, final String keyPassword) throws CertificateException, NoSuchAlgorithmException, KeyStoreException, IOException, UnrecoverableKeyException, KeyManagementException {
+    private SSLContext createSSLContext(final File keyStoreFile, final String storePassword, final String keyPassword) throws Exception {
         return SSLContexts.custom()
                 .loadKeyMaterial(keyStoreFile, storePassword.toCharArray(), keyPassword.toCharArray())
                 .build();
     }
+
+    private SSLContext createSSLContext(final KeyStore keyStore, final char[] password) throws Exception {
+        return SSLContexts.custom().loadKeyMaterial(keyStore, password).build();
+    }
+
     public static void main(String[] args) throws IOException {
         OrderedProperties properties = getDefaultProperties();
         if(args.length == 0){
@@ -93,7 +134,9 @@ public class CollaboratorServer {
                 return;
             }
             FileOutputStream outputStream = new FileOutputStream(defaultsFile);
-            properties.store(outputStream, "MAKE SURE THE SECRET IS CHANGED TO SOMETHING MORE SECURE!");
+            properties.store(outputStream, "MAKE SURE THE SECRET IS CHANGED TO SOMETHING MORE SECURE!\n" +
+                    "By default, the private key and certificates will be used to\n" +
+                    "configure the SSL context. To use a keystore instead, comment out " + PRIVATE_KEY_PATH + ".");
             System.out.println("Default config written to " + defaultsFile.getName());
             System.out.println("Edit the config (especially the secret!)");
             System.out.println("Then start the server with `java -jar CollaboratorAuth.jar " + defaultsFile.getName() + "`");
@@ -122,15 +165,20 @@ public class CollaboratorServer {
     }
 
     private static OrderedProperties getDefaultProperties(){
-        OrderedProperties defaultProperties = new OrderedProperties();
+        OrderedProperties defaultProperties = new OrderedProperties.OrderedPropertiesBuilder()
+                .withSuppressDateInComment(true).build();
         defaultProperties.setProperty(COLLABORATOR_SERVER_ADDRESS, "127.0.0.1");
         defaultProperties.setProperty(COLLABORATOR_SERVER_PORT, "80");
         defaultProperties.setProperty(LISTEN_PORT, "5050");
         defaultProperties.setProperty(LISTEN_ADDRESS, "0.0.0.0");
         defaultProperties.setProperty(LISTEN_SSL, "false");
+        defaultProperties.setProperty(PRIVATE_KEY_PATH, "/certs/key.pem.pkcs8");
+        defaultProperties.setProperty(CERTIFICATE_PATH, "/certs/cert.crt");
+        defaultProperties.setProperty(INTERMEDIATE_CERTIFICATE_PATH, INTERMEDIATE_CERTIFICATE_DEFAULT);
         defaultProperties.setProperty(KEYSTORE_FILE, "/path/to/java/keystore");
         defaultProperties.setProperty(KEYSTORE_PASSWORD, "KEYSTOREPASSWORD");
         defaultProperties.setProperty(KEYSTORE_KEY_PASSWORD, "KEYSTOREPASSWORD_FOR_KEYS");
+
         defaultProperties.setProperty(SECRET, "CHANGE_ME");
         defaultProperties.setProperty(LOG_LEVEL, "INFO");
 
