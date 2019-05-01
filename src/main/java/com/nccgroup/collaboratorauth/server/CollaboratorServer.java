@@ -61,18 +61,22 @@ public class CollaboratorServer {
                 .registerHandler("*", new HttpHandler(actualAddress, actualPort, actualIsHttps, secret, logLevel));
 
         if(listenSSL){
+            System.out.println("Starting server in HTTPS mode. Creating SSL context.");
             SSLContext sslContext;
             if(!properties.getProperty(PRIVATE_KEY_PATH).equals("")){
                 //Load private key
+                System.out.println("Loading private key from file: " + properties.getProperty(PRIVATE_KEY_PATH));
                 PrivateKey privateKey = Utilities.loadPrivateKeyFromFile(properties.getProperty(PRIVATE_KEY_PATH));
 
                 ArrayList<Certificate> certificateList = new ArrayList<>();
                 //Load certificate
+                System.out.println("Loading certificate from file: " + properties.getProperty(CERTIFICATE_PATH));
                 certificateList.add(Utilities.loadCertificateFromFile(properties.getProperty(CERTIFICATE_PATH)));
                 //Load intermediate certificate
                 String intermediatePath = properties.getProperty(INTERMEDIATE_CERTIFICATE_PATH);
                 if(!intermediatePath.equals("") && !intermediatePath.equals(INTERMEDIATE_CERTIFICATE_DEFAULT)){
-                    certificateList.add(Utilities.loadCertificateFromFile(properties.getProperty(intermediatePath)));
+                    System.out.println("Loading intermediate certificate from file: " + properties.getProperty(INTERMEDIATE_CERTIFICATE_PATH));
+                    certificateList.add(Utilities.loadCertificateFromFile(intermediatePath));
                 }
                 Certificate[] certificateChain = certificateList.toArray(new Certificate[0]);
 
@@ -90,6 +94,8 @@ public class CollaboratorServer {
                 sslContext = createSSLContext(keystoreFile, storePassword, keyPassword);
             }
             serverBootstrap.setSslContext(sslContext);
+        }else{
+            System.out.println("Starting server in HTTP mode.");
         }
 
         if(logLevel.equalsIgnoreCase("debug") || logLevel.equalsIgnoreCase("error"))

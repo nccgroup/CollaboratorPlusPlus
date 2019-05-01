@@ -2,6 +2,8 @@ package com.nccgroup.collaboratorauth.extension;
 
 import com.nccgroup.collaboratorauth.extension.ui.ConfigUI;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 
 public class LogController {
@@ -37,6 +39,14 @@ public class LogController {
     public void logDebug(String message){
         for (LogListener logListener : this.logListeners) {
             logListener.onDebug(message);
+        }
+    }
+
+    public void logError(Exception ex){
+        StringWriter sw = new StringWriter();
+        ex.printStackTrace(new PrintWriter(sw));
+        for (LogListener logListener : logListeners) {
+            logListener.onError(sw.toString());
         }
     }
 }

@@ -36,9 +36,10 @@ public class HttpHandler implements HttpRequestHandler {
     }
 
     @Override
-    public void handle(HttpRequest request, HttpResponse response, HttpContext context) throws HttpException, IOException {
+    public void handle(HttpRequest request, HttpResponse response, HttpContext context) throws IOException {
         if(!(request instanceof BasicHttpEntityEnclosingRequest)){
-            response.setEntity(new StringEntity("Request was not an instance of BasicHttpEntityEnclosingRequest."));
+            //TODO Respond with information about what the purpose of the server is.
+            response.setEntity(new StringEntity(""));
             response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
             return;
         }
@@ -58,6 +59,12 @@ public class HttpHandler implements HttpRequestHandler {
 
                 String requestEncoded = requestJsonObject.get("request").getAsString();
                 String requestDecoded = new String(Base64.getDecoder().decode(requestEncoded));
+
+                if(!requestDecoded.startsWith("/burpresults?biid=")){ //If request is not a valid collaborator request. (SSRF protection!)
+                    response.setEntity(new StringEntity("The request does not look like a valid collaborator request!"));
+                    response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
+                    return;
+                }
 
                 //Make request to actual collaborator server
                 URI getURI = new URL((actualIsHttps ? "https://" : "http://") + actualAddress + ":" + actualPort
@@ -87,10 +94,10 @@ public class HttpHandler implements HttpRequestHandler {
                 response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
             }
         }catch (HttpHostConnectException e){
-            response.setEntity(new StringEntity("The collaborator auth server could not contact the actual collaborator server!"));
+            response.setEntity(new StringEntity(e.getMessage()));
             response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
         }catch (Exception e){
-            response.setEntity(new StringEntity("The collaborator auth server could not contact the actual collaborator server!"));
+            response.setEntity(new StringEntity(e.getMessage()));
             response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
         }finally {
             client.close();

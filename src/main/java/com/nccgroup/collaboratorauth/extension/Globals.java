@@ -14,5 +14,9 @@ public class Globals {
     public static final String COLLABORATOR_SERVER_CONFIG_PATH = "project_options.misc.collaborator_server";
     public static final String HOSTNAME_RESOLUTION_CONFIG_PATH = "project_options.connections.hostname_resolution";
     public static final String PUBLIC_COLLABORATOR_HOSTNAME = "burpcollaborator.net";
+    public static final String GITHUB_URL = "https://github.com/coreyd97/CollaboratorAuth";
+    public static final String TWITTER_URL = "https://twitter.com/coreyd97";
+    public static final String NCC_TWITTER_URL = "https://twitter.com/NCCGroupplc";
+
 
 }

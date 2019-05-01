@@ -1,15 +1,14 @@
 package com.nccgroup.collaboratorauth.extension;
 
-import org.apache.commons.io.IOUtils;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import org.apache.http.*;
 import org.apache.http.client.ClientProtocolException;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.conn.ssl.AllowAllHostnameVerifier;
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
 import org.apache.http.conn.ssl.TrustAllStrategy;
-import org.apache.http.entity.BasicHttpEntity;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.NoConnectionReuseStrategy;
 import org.apache.http.impl.bootstrap.HttpServer;
@@ -19,48 +18,39 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.protocol.HttpContext;
 import org.apache.http.protocol.HttpRequestHandler;
 import org.apache.http.ssl.SSLContextBuilder;
-import org.apache.http.ssl.SSLContexts;
+import org.apache.http.ssl.TrustStrategy;
 import org.apache.http.util.EntityUtils;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLHandshakeException;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
 import java.io.*;
 import java.net.Inet4Address;
 import java.net.URI;
 import java.security.KeyManagementException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
-import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.concurrent.TimeUnit;
 
+import static com.nccgroup.collaboratorauth.extension.CollaboratorAuthenticator.logController;
+
 public class ProxyService implements HttpRequestHandler {
 
-    private final CollaboratorAuthenticator extension;
     private final int listenPort;
-    private final boolean useSsl;
     private final boolean ignoreCertificateErrors;
     private final ArrayList<ProxyServiceListener> listeners;
 
     private String sessionKey;
     private HttpServer server;
-    private URI collaboratorServer;
+    private URI forwardingURI;
 
-    public ProxyService(CollaboratorAuthenticator authenticator,
-                        Integer listenPort, boolean useSsl, boolean ignoreCertificateErrors,
-                        URI collaboratorServer, String sessionKey){
-        this.extension = authenticator;
-        this.listenPort = listenPort;
-        this.useSsl = useSsl;
-        this.ignoreCertificateErrors = ignoreCertificateErrors;
-        this.collaboratorServer = collaboratorServer;
-        this.sessionKey = sessionKey;
-
+    public ProxyService(Integer listenPort, boolean ignoreCertificateErrors, URI forwardingURI, String secret){
         this.listeners = new ArrayList<>();
+        this.listenPort = listenPort;
+        this.ignoreCertificateErrors = ignoreCertificateErrors;
+        this.forwardingURI = forwardingURI;
+        this.sessionKey = secret;
     }
 
     public void start() throws IOException, IllegalStateException {
@@ -75,14 +65,12 @@ public class ProxyService implements HttpRequestHandler {
                                             .registerHandler("*", this);
 
         serverBootstrap.setExceptionLogger(ex -> {
-//            System.out.println(ex.getMessage());
+            logController.logError(ex.getMessage());
+            logController.logError(ex);
             for (ProxyServiceListener listener : this.listeners) {
                 listener.onFail(ex.getMessage());
             }
         });
-
-//        SSLContext sslContext = createSSLContext(this.ignoreCertificateErrors);
-//        serverBootstrap.setSslContext(sslContext); //TODO ENABLE SSL SUPPORT
 
         server = serverBootstrap.create();
         assert server != null;
@@ -93,37 +81,47 @@ public class ProxyService implements HttpRequestHandler {
 
     public void stop(){
         if(server != null){
-            server.shutdown(10, TimeUnit.SECONDS);
+            server.shutdown(10, TimeUnit.MICROSECONDS);
         }
     }
 
     private SSLContext createSSLContext(boolean ignoreCertificateErrors) throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
-        SSLContext context = SSLContextBuilder.create().loadTrustMaterial(new TrustAllStrategy()).build();
+        TrustStrategy trustStrategy;
+        SSLContext context;
+        if(ignoreCertificateErrors){
+            trustStrategy = new TrustAllStrategy();
+             context = SSLContextBuilder.create().loadTrustMaterial(trustStrategy).build();
+        }else{
+             context = SSLContextBuilder.create().build();
+        }
         return context;
     }
 
     @Override
-    public void handle(HttpRequest request, HttpResponse forwardedResponse, HttpContext context) throws HttpException, IOException {
-        CloseableHttpClient client = null;
+    public void handle(HttpRequest request, HttpResponse forwardedResponse, HttpContext context) throws IOException {
+        CloseableHttpClient client;
         try {
             client = HttpClients.custom().setSSLContext(createSSLContext(true))
-                    .setSSLHostnameVerifier(AllowAllHostnameVerifier.INSTANCE)
+                    .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
                     .setConnectionReuseStrategy(new NoConnectionReuseStrategy())
                     .build();
         } catch (NoSuchAlgorithmException | KeyStoreException | KeyManagementException e) {
+            logController.logDebug("Could not create HTTP client, " + e.getMessage());
+            logController.logError(e);
             for (ProxyServiceListener listener : listeners) {
-                listener.onFail("Could not build HttpClient.");
+                listener.onFail("Could not build the HTTP client. Unable to poll the Collaborator Authenticator server.");
             }
-            e.printStackTrace();
             return;
         }
 
         //Build request to auth server
-        HttpPost post = new HttpPost(collaboratorServer);
+        HttpPost post = new HttpPost(forwardingURI);
         String encodedURI = Base64.getEncoder().encodeToString(request.getRequestLine().getUri().getBytes());
         String postData = "{\"secret\":\"" + this.sessionKey + "\",\"request\":\"" + encodedURI + "\"}";
         post.setEntity(new StringEntity(postData));
         post.addHeader("Connection", "close");
+
+        logController.logDebug("Requesting interactions from authentication server, " + postData);
 
         HttpResponse actualServerResponse = null;
 
@@ -133,14 +131,22 @@ public class ProxyService implements HttpRequestHandler {
             int statusCode = actualServerResponse.getStatusLine().getStatusCode();
             String responseString = EntityUtils.toString(actualServerResponse.getEntity());
 
+            logController.logDebug("Received response: Status " + statusCode + ", " + responseString);
+
             forwardedResponse.setStatusCode(statusCode);
 
             if (statusCode == HttpStatus.SC_OK) {
 
-                for (ProxyServiceListener listener : this.listeners) {
-                    listener.onSuccess(responseString);
-                }
+                JsonObject responseJson = new JsonParser().parse(responseString).getAsJsonObject();
+                int interactions = responseJson.has("responses")
+                        ? responseJson.getAsJsonArray("responses").size()
+                        : 0;
+                if(interactions != 0)
+                    logController.logInfo(interactions +
+                        (interactions == 1 ? " interaction" : " interactions") + " retrieved.");
+                handleSuccess(responseString);
 
+                //Must forward collaborator headers to the client too!
                 for (Header header : actualServerResponse.getAllHeaders()) {
                     if(header.getName().equalsIgnoreCase("X-Collaborator-Version")
                             || header.getName().equalsIgnoreCase("X-Collaborator-Time")){
@@ -149,16 +155,13 @@ public class ProxyService implements HttpRequestHandler {
                 }
 
             } else if (statusCode == HttpStatus.SC_UNAUTHORIZED) {
-                //Incorrect secret
                 responseString = "The provided secret is incorrect";
-                for (ProxyServiceListener listener : this.listeners) {
-                    listener.onFail(responseString);
-                }
+                logController.logDebug(responseString);
+                handleFailure(responseString);
             } else {
-                responseString = "An error occurred on the server.\n" + responseString;
-                for (ProxyServiceListener listener : this.listeners) {
-                    listener.onFail(responseString);
-                }
+                responseString = "The server could not process the request. " + responseString;
+                logController.logDebug(responseString);
+                handleFailure(responseString);
             }
 
             StringEntity forwardedResponseEntity = new StringEntity(responseString);
@@ -166,12 +169,25 @@ public class ProxyService implements HttpRequestHandler {
             forwardedResponse.setEntity(forwardedResponseEntity);
 
         }catch (ClientProtocolException | SSLHandshakeException e){
+            logController.logError(e);
             for (ProxyServiceListener listener : this.listeners) {
                 listener.onFail(e.getMessage() != null ? e.getMessage() :
                         "SSL exception. Check you're targetting the correct protocol.");
             }
         }finally {
             client.close();
+        }
+    }
+
+    private void handleFailure(String reason){
+        for (ProxyServiceListener proxyServiceListener : new ArrayList<>(this.listeners)) {
+            proxyServiceListener.onFail(reason);
+        }
+    }
+
+    private void handleSuccess(String message){
+        for (ProxyServiceListener proxyServiceListener : new ArrayList<>(this.listeners)) {
+            proxyServiceListener.onSuccess(message);
         }
     }
 

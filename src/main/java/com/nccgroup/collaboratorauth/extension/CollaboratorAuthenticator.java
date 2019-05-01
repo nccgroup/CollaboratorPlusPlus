@@ -2,12 +2,12 @@ package com.nccgroup.collaboratorauth.extension;
 
 import burp.IBurpExtender;
 import burp.IBurpExtenderCallbacks;
-import burp.IExtensionHelpers;
 import burp.IExtensionStateListener;
 import com.coreyd97.BurpExtenderUtilities.DefaultGsonProvider;
 import com.coreyd97.BurpExtenderUtilities.Preferences;
-import com.google.gson.*;
 import com.nccgroup.collaboratorauth.extension.ui.ConfigUI;
+import com.nccgroup.collaboratorauth.extension.ui.ExtensionUI;
+
 import static com.nccgroup.collaboratorauth.extension.Globals.*;
 
 import javax.swing.*;
@@ -25,7 +25,19 @@ public class CollaboratorAuthenticator implements IBurpExtender, IExtensionState
     private Preferences preferences;
 
     //UI
-    private JPanel ui;
+    private ExtensionUI ui;
+
+    public CollaboratorAuthenticator(){
+        //Fix Darcula's issue with JSpinner UI.
+        try {
+            Class spinnerUI = Class.forName("com.bulenkov.darcula.ui.DarculaSpinnerUI");
+            UIManager.put("com.bulenkov.darcula.ui.DarculaSpinnerUI", spinnerUI);
+            Class sliderUI = Class.forName("com.bulenkov.darcula.ui.DarculaSliderUI");
+            UIManager.put("com.bulenkov.darcula.ui.DarculaSliderUI", sliderUI);
+        } catch (ClassNotFoundException e) {
+            //Darcula is not installed.
+        }
+    }
 
     @Override
     public void registerExtenderCallbacks(IBurpExtenderCallbacks callbacks) {
@@ -44,7 +56,8 @@ public class CollaboratorAuthenticator implements IBurpExtender, IExtensionState
         this.preferences.addSetting(PREF_BLOCK_PUBLIC_COLLABORATOR, Boolean.class, true);
 
         SwingUtilities.invokeLater(() -> {
-            CollaboratorAuthenticator.callbacks.addSuiteTab(new ConfigUI(this));
+            this.ui = new ExtensionUI(this);
+            CollaboratorAuthenticator.callbacks.addSuiteTab(this.ui);
             CollaboratorAuthenticator.callbacks.registerExtensionStateListener(this);
         });
 
@@ -55,7 +68,6 @@ public class CollaboratorAuthenticator implements IBurpExtender, IExtensionState
 
     public void startCollaboratorProxy() throws IOException, URISyntaxException {
         boolean ssl = (boolean) this.preferences.getSetting(PREF_REMOTE_SSL_ENABLED);
-
 
         URI destination = new URI(ssl ? "https" : "http", null,
                 (String) this.preferences.getSetting(PREF_POLLING_ADDRESS),
@@ -69,7 +81,7 @@ public class CollaboratorAuthenticator implements IBurpExtender, IExtensionState
         //Start the proxy service listening at the given location
         if(proxyService != null) proxyService.stop();
 
-        proxyService = new ProxyService(this, listenPort, true, true, destinationURI, secret);
+        proxyService = new ProxyService(listenPort, true, destinationURI, secret);
         proxyService.start();
 
         saveCollaboratorConfig();
@@ -80,7 +92,6 @@ public class CollaboratorAuthenticator implements IBurpExtender, IExtensionState
         if(proxyService != null) {
             proxyService.stop();
             proxyService = null;
-            //System.out.println("Polling Listener Stopped...");
             logController.logInfo("Polling Listener Stopped...");
         }
         restoreCollaboratorConfig();

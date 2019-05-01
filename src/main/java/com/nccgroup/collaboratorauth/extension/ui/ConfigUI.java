@@ -10,18 +10,23 @@ import com.nccgroup.collaboratorauth.extension.Utilities;
 import org.apache.http.impl.bootstrap.HttpServer;
 
 import javax.swing.*;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.text.*;
 import java.awt.*;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.concurrent.TimeUnit;
 
 import static com.nccgroup.collaboratorauth.extension.CollaboratorAuthenticator.callbacks;
 import static com.nccgroup.collaboratorauth.extension.CollaboratorAuthenticator.logController;
 import static com.nccgroup.collaboratorauth.extension.Globals.*;
 
-public class ConfigUI implements ITab, LogListener {
+public class ConfigUI extends JPanel implements LogListener {
 
     private final CollaboratorAuthenticator extension;
-    private final JPanel mainPanel;
     private JToggleButton startStopButton;
     private JSpinner localPortSpinner;
     private JSpinner remotePortSpinner;
@@ -33,16 +38,29 @@ public class ConfigUI implements ITab, LogListener {
     private JLabel statusLabel;
     private JTextArea logArea;
 
-    private boolean serverStarting = false;
+    private String logLevel;
+    private boolean serverStarting;
 
     public ConfigUI(CollaboratorAuthenticator extension){
-        this.extension = extension;
         CollaboratorAuthenticator.logController.addLogListener(this);
-        this.mainPanel = buildMainPanel();
+        this.setLayout(new BorderLayout());
+        this.extension = extension;
+        JPanel panel = buildMainPanel();
+        this.add(panel, BorderLayout.CENTER);
+        this.addMouseListener(new MouseAdapter() {
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                if(e.getButton() != MouseEvent.BUTTON3) return;
+                ConfigUI.this.removeAll();
+                ConfigUI.this.add(buildMainPanel());
+                ConfigUI.this.revalidate();
+                ConfigUI.this.repaint();
+            }
+        });
     }
 
     public JPanel buildMainPanel(){
-
         PanelBuilder panelBuilder = new PanelBuilder(extension.getPreferences());
         ComponentGroup configGroup = panelBuilder.createComponentGroup("Configuration");
         localPortSpinner = (JSpinner) configGroup.addPreferenceComponent(PREF_LOCAL_PORT, "Local Port");
@@ -83,33 +101,53 @@ public class ConfigUI implements ITab, LogListener {
         ComponentGroup secretGroup = panelBuilder.createComponentGroup("Shared Secret");
         secretArea = panelBuilder.createPreferenceTextArea(PREF_SECRET);
         secretArea.setLineWrap(true);
-        secretArea.setRows(30);
-        secretArea.setColumns(40);
         JScrollPane secretScrollPane = new JScrollPane(secretArea);
         secretScrollPane.setBorder(null);
         secretGroup.addComponent(secretScrollPane);
-        secretGroup.setMinimumSize(new Dimension(400, 400));
 
         ComponentGroup logGroup = panelBuilder.createComponentGroup("Message Log");
-        logArea = new JTextArea(30,40);
+        logArea = new JTextArea();
         logArea.setLineWrap(true);
         logArea.setWrapStyleWord(true);
         logArea.setBorder(null);
+        logArea.setEditable(false);
+        DefaultCaret caret = (DefaultCaret)logArea.getCaret();
+        caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
         JScrollPane logScrollPane = new JScrollPane(logArea);
+        logScrollPane.setBorder(BorderFactory.createLineBorder(Color.ORANGE));
         logScrollPane.setBorder(null);
-        logGroup.addComponent(logScrollPane);
-        JButton clearButton = panelBuilder.createButton("Clear Logs", actionEvent -> {
-            logArea.setText("");
+        JPanel logLevelPanel = new JPanel(new GridLayout(1,2));
+        JComboBox logLevelSelector = new JComboBox(new String[]{"INFO", "DEBUG"});
+        this.logLevel = "INFO";
+        logLevelSelector.setSelectedItem(this.logLevel);
+        logLevelSelector.addActionListener(e -> {
+            this.logLevel = (String) logLevelSelector.getSelectedItem();
         });
-        clearButton.setMaximumSize(new Dimension(Integer.MAX_VALUE, 20));
-        logGroup.addComponent(clearButton);
-        logGroup.setMinimumSize(new Dimension(400, 400));
+        logLevelPanel.add(new JLabel("Log Level: "));
+        logLevelPanel.add(logLevelSelector);
+        JButton clearButton = panelBuilder.createButton("Clear Logs", actionEvent -> logArea.setText(""));
+//        clearButton.setMaximumSize(new Dimension(Integer.MAX_VALUE, 20));
+
+        GridBagConstraints logPanelGbc = logGroup.generateNextConstraints();
+        logPanelGbc.weighty = 0;
+        logGroup.addComponent(logLevelPanel, logPanelGbc);
+        logPanelGbc = logGroup.generateNextConstraints();
+        logPanelGbc.weighty = 0;
+        logGroup.addComponent(new JSeparator(JSeparator.HORIZONTAL), logPanelGbc);
+        logGroup.addComponent(logScrollPane, logGroup.generateNextConstraints());
+        logPanelGbc = logGroup.generateNextConstraints();
+        logPanelGbc.weighty = 0;
+        logGroup.addComponent(clearButton, logPanelGbc);
 
         try {
-            return panelBuilder.build(new JComponent[][]{
-                    new JComponent[]{null, configGroup, controlGroup, null},
-                    new JComponent[]{null, secretGroup, logGroup, null},
-            }, PanelBuilder.Alignment.TOPMIDDLE);
+            return panelBuilder.build(
+                new JComponent[][]{
+                    new JComponent[]{configGroup, controlGroup},
+                    new JComponent[]{secretGroup, logGroup},
+                }, new int[][]{
+                    new int[]{0, 0},
+                    new int[]{1 ,1},
+                }, PanelBuilder.Alignment.TOPMIDDLE, 1, 1);
         } catch (Exception e) {
             e.printStackTrace();
             JLabel error = new JLabel("Could not build the panel! :(");
@@ -133,11 +171,11 @@ public class ConfigUI implements ITab, LogListener {
             //Check the authentication
             ProxyServiceListener failListener = new ProxyServiceListener() {
                 @Override
-                public void onFail(String message) {
+                public void onFail(String reason) {
                     //Synchronized to stop double error issue.
                     synchronized (this) {
                         if(serverStarting) {
-                            onServerStartFailure(message);
+                            onServerStartFailure(reason);
                             if (extension.getProxyService() != null) {
                                 extension.getProxyService().removeProxyServiceListener(this);
                                 extension.stopCollaboratorProxy();
@@ -149,9 +187,11 @@ public class ConfigUI implements ITab, LogListener {
                 @Override
                 public void onSuccess(String message) {
                     synchronized (this) {
-                        onServerStartSuccess(message);
-                        if (extension.getProxyService() != null) {
-                            extension.getProxyService().removeProxyServiceListener(this);
+                        if(serverStarting) {
+                            onServerStartSuccess();
+                            if (extension.getProxyService() != null) {
+                                extension.getProxyService().removeProxyServiceListener(this);
+                            }
                         }
                     }
                 }
@@ -164,12 +204,12 @@ public class ConfigUI implements ITab, LogListener {
             new Thread(() -> callbacks.createBurpCollaboratorClientContext().fetchAllCollaboratorInteractions()).start();
 
         }catch (Exception e){
-            onServerStartFailure("Could not start local server: " + e.getMessage());
+            onServerStartFailure(e.getMessage());
         }
     }
 
-    private void onServerStartFailure(String message){
-        logController.logError("Could not start local authentication proxy: " + message);
+    private void onServerStartFailure(String reason){
+        logController.logInfo("Failed to start the local authentication proxy, " + reason);
         serverStarting = false;
 
         startStopButton.setText("Start");
@@ -185,7 +225,8 @@ public class ConfigUI implements ITab, LogListener {
             extension.stopCollaboratorProxy();
     }
 
-    private void onServerStartSuccess(String message){
+    private void onServerStartSuccess(){
+        serverStarting = false;
         logController.logInfo("Local authentication proxy started!");
         startStopButton.setText("Stop");
         statusLabel.setText("Status: Listening on port " + localPortSpinner.getValue());
@@ -239,21 +280,13 @@ public class ConfigUI implements ITab, LogListener {
 
     @Override
     public void onError(String message) {
+        if(this.logLevel.equalsIgnoreCase("DEBUG"))
         logArea.append("ERROR: " + message + "\n");
     }
 
     @Override
     public void onDebug(String message) {
+        if(this.logLevel.equalsIgnoreCase("DEBUG"))
         logArea.append("DEBUG: " + message + "\n");
-    }
-
-    @Override
-    public String getTabCaption() {
-        return EXTENSION_NAME;
-    }
-
-    @Override
-    public Component getUiComponent() {
-        return mainPanel;
     }
 }
