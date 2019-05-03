@@ -1,6 +1,5 @@
 package com.nccgroup.collaboratorauth.extension.ui;
 
-import burp.ITab;
 import com.coreyd97.BurpExtenderUtilities.ComponentGroup;
 import com.coreyd97.BurpExtenderUtilities.PanelBuilder;
 import com.nccgroup.collaboratorauth.extension.CollaboratorAuthenticator;
@@ -10,12 +9,8 @@ import com.nccgroup.collaboratorauth.extension.Utilities;
 import org.apache.http.impl.bootstrap.HttpServer;
 
 import javax.swing.*;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
-import javax.swing.text.*;
+import javax.swing.text.DefaultCaret;
 import java.awt.*;
-import java.awt.event.ComponentAdapter;
-import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.concurrent.TimeUnit;
@@ -33,6 +28,8 @@ public class ConfigUI extends JPanel implements LogListener {
     private JTextField remoteAddressField;
     private JTextField collaboratorLocationField;
     private JCheckBox sslEnabledCheckbox;
+    private JCheckBox trustSelfSignedCheckbox;
+    private JCheckBox hostnameVerificationCheckbox;
     private JCheckBox blockPublicCollaborator;
     private JTextArea secretArea;
     private JLabel statusLabel;
@@ -73,12 +70,34 @@ public class ConfigUI extends JPanel implements LogListener {
         ((SpinnerNumberModel) remotePortSpinner.getModel()).setMinimum(0);
         ((SpinnerNumberModel) remotePortSpinner.getModel()).setMaximum(65535);
         remotePortSpinner.setEditor(new JSpinner.NumberEditor(remotePortSpinner, "#"));
-        sslEnabledCheckbox = (JCheckBox) configGroup.addPreferenceComponent(PREF_REMOTE_SSL_ENABLED, "Use SSL?");
-        blockPublicCollaborator = (JCheckBox) configGroup.addPreferenceComponent(PREF_BLOCK_PUBLIC_COLLABORATOR, "Block Public Collaborator Server?");
+
+
+        sslEnabledCheckbox = panelBuilder.createPreferenceCheckBox(PREF_REMOTE_SSL_ENABLED, "Use SSL");
+        trustSelfSignedCheckbox = panelBuilder.createPreferenceCheckBox(PREF_IGNORE_CERTIFICATE_ERRORS, "Ignore Certificate Errors");
+        hostnameVerificationCheckbox = panelBuilder.createPreferenceCheckBox(PREF_SSL_HOSTNAME_VERIFICATION, "Enable SSL Hostname Verification");
+        blockPublicCollaborator = panelBuilder.createPreferenceCheckBox(PREF_BLOCK_PUBLIC_COLLABORATOR, "Block Public Collaborator Server");
         blockPublicCollaborator.addActionListener(actionEvent -> {
             if(blockPublicCollaborator.isSelected()) Utilities.blockPublicCollaborator();
             else Utilities.unblockPublicCollaborator();
         });
+        sslEnabledCheckbox.addActionListener(actionEvent -> {
+            boolean sslEnabled = sslEnabledCheckbox.isSelected();
+            trustSelfSignedCheckbox.setEnabled(sslEnabled);
+            hostnameVerificationCheckbox.setEnabled(sslEnabled);
+        });
+        JComponent checkboxComponentsPanel;
+        try {
+            checkboxComponentsPanel = panelBuilder.build(new JComponent[][]{
+                    new JComponent[]{sslEnabledCheckbox, trustSelfSignedCheckbox},
+                    new JComponent[]{hostnameVerificationCheckbox, blockPublicCollaborator}
+            }, new int[][]{
+                    new int[]{1, 1},
+                    new int[]{1, 1}
+            }, PanelBuilder.Alignment.FILL, 1, 1);
+        } catch (Exception e) {
+            checkboxComponentsPanel = new JLabel("Could not build checkbox components panel");
+        }
+        configGroup.addComponent(checkboxComponentsPanel);
 
 
         //Control Panel
@@ -270,23 +289,31 @@ public class ConfigUI extends JPanel implements LogListener {
         remotePortSpinner.setEnabled(enabled);
         sslEnabledCheckbox.setEnabled(enabled);
         blockPublicCollaborator.setEnabled(enabled);
+        trustSelfSignedCheckbox.setEnabled(enabled);
+        hostnameVerificationCheckbox.setEnabled(enabled);
         secretArea.setEnabled(enabled);
     }
     
     @Override
     public void onInfo(String message) {
-        logArea.append("INFO: " + message + "\n");
+        synchronized (logArea) {
+            logArea.append("INFO: " + message + "\n");
+        }
     }
 
     @Override
     public void onError(String message) {
-        if(this.logLevel.equalsIgnoreCase("DEBUG"))
-        logArea.append("ERROR: " + message + "\n");
+        synchronized (logArea) {
+            if (this.logLevel.equalsIgnoreCase("DEBUG"))
+                logArea.append("ERROR: " + message + "\n");
+        }
     }
 
     @Override
     public void onDebug(String message) {
-        if(this.logLevel.equalsIgnoreCase("DEBUG"))
-        logArea.append("DEBUG: " + message + "\n");
+        synchronized (logArea) {
+            if (this.logLevel.equalsIgnoreCase("DEBUG"))
+                logArea.append("DEBUG: " + message + "\n");
+        }
     }
 }

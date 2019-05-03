@@ -5,10 +5,6 @@ import javax.swing.text.*;
 
 public class WrappedTextPane extends JTextPane {
 
-    public WrappedTextPane(StyledDocument styledDocument){
-        this.setEditorKit(new WrapEditorKit());
-    }
-
     public WrappedTextPane(){
         this.setEditorKit(new WrapEditorKit());
     }

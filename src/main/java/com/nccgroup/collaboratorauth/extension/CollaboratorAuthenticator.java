@@ -5,8 +5,8 @@ import burp.IBurpExtenderCallbacks;
 import burp.IExtensionStateListener;
 import com.coreyd97.BurpExtenderUtilities.DefaultGsonProvider;
 import com.coreyd97.BurpExtenderUtilities.Preferences;
-import com.nccgroup.collaboratorauth.extension.ui.ConfigUI;
 import com.nccgroup.collaboratorauth.extension.ui.ExtensionUI;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 import static com.nccgroup.collaboratorauth.extension.Globals.*;
 
@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.net.Inet4Address;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.security.Security;
 
 public class CollaboratorAuthenticator implements IBurpExtender, IExtensionStateListener {
 
@@ -28,6 +29,7 @@ public class CollaboratorAuthenticator implements IBurpExtender, IExtensionState
     private ExtensionUI ui;
 
     public CollaboratorAuthenticator(){
+        Security.addProvider(new BouncyCastleProvider());
         //Fix Darcula's issue with JSpinner UI.
         try {
             Class spinnerUI = Class.forName("com.bulenkov.darcula.ui.DarculaSpinnerUI");
@@ -50,6 +52,8 @@ public class CollaboratorAuthenticator implements IBurpExtender, IExtensionState
         this.preferences.addSetting(PREF_POLLING_ADDRESS, String.class, "your.collaborator.authenticator.server");
         this.preferences.addSetting(PREF_POLLING_PORT, Integer.class, 5050);
         this.preferences.addSetting(PREF_REMOTE_SSL_ENABLED, Boolean.class, true);
+        this.preferences.addSetting(PREF_IGNORE_CERTIFICATE_ERRORS, Boolean.class, false);
+        this.preferences.addSetting(PREF_SSL_HOSTNAME_VERIFICATION, Boolean.class, true);
         this.preferences.addSetting(PREF_LOCAL_PORT, Integer.class, 32541);
         this.preferences.addSetting(PREF_SECRET, String.class, "Your Secret String");
         this.preferences.addSetting(PREF_ORIGINAL_COLLABORATOR_SETTINGS, String.class, "");
@@ -81,7 +85,9 @@ public class CollaboratorAuthenticator implements IBurpExtender, IExtensionState
         //Start the proxy service listening at the given location
         if(proxyService != null) proxyService.stop();
 
-        proxyService = new ProxyService(listenPort, true, destinationURI, secret);
+        boolean ignoreCertificateErrors = (boolean) this.preferences.getSetting(PREF_IGNORE_CERTIFICATE_ERRORS);
+        boolean verifyHostname = (boolean) this.preferences.getSetting(PREF_SSL_HOSTNAME_VERIFICATION);
+        proxyService = new ProxyService(listenPort, destinationURI, secret, ignoreCertificateErrors, verifyHostname);
         proxyService.start();
 
         saveCollaboratorConfig();

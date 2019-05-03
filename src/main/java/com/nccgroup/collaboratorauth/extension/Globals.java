@@ -7,6 +7,8 @@ public class Globals {
     public static final String PREF_POLLING_ADDRESS = "pollingAddress";
     public static final String PREF_POLLING_PORT = "remotePort";
     public static final String PREF_REMOTE_SSL_ENABLED = "remoteSSLEnabled";
+    public static final String PREF_IGNORE_CERTIFICATE_ERRORS = "ignoreCertificateErrors";
+    public static final String PREF_SSL_HOSTNAME_VERIFICATION = "sslHostnameVerification";
     public static final String PREF_LOCAL_PORT = "localPort";
     public static final String PREF_SECRET = "sharedSecret";
     public static final String PREF_ORIGINAL_COLLABORATOR_SETTINGS = "origPollSettings";

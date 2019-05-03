@@ -5,6 +5,7 @@ import org.apache.http.impl.NoConnectionReuseStrategy;
 import org.apache.http.impl.bootstrap.HttpServer;
 import org.apache.http.impl.bootstrap.ServerBootstrap;
 import org.apache.http.ssl.SSLContexts;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 import javax.net.ssl.SSLContext;
 import java.io.File;
@@ -14,6 +15,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.security.KeyStore;
 import java.security.PrivateKey;
+import java.security.Security;
 import java.security.cert.Certificate;
 import java.util.ArrayList;
 import java.util.Properties;
@@ -43,6 +45,7 @@ public class CollaboratorServer {
     private String logLevel;
 
     private CollaboratorServer(Properties properties) throws Exception {
+        Security.addProvider(new BouncyCastleProvider());
         String actualAddress = properties.getProperty(COLLABORATOR_SERVER_ADDRESS);
         Integer actualPort = Integer.parseInt(properties.getProperty(COLLABORATOR_SERVER_PORT));
         boolean actualIsHttps = Boolean.parseBoolean(properties.getProperty(COLLABORATOR_SERVER_ISHTTPS));
@@ -109,7 +112,7 @@ public class CollaboratorServer {
             server.start();
             System.out.println("Server started. Listening for poll requests on port " + listenPort + "...");
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                server.shutdown(5, TimeUnit.SECONDS);
+                server.shutdown(500, TimeUnit.MILLISECONDS);
             }));
         }
     }
