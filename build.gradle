@@ -21,13 +21,15 @@ repositories {
 }
 
 dependencies {
-    compile 'com.github.CoreyD97:BurpExtenderUtilities:5e7d059bb5'
+    compile 'com.github.CoreyD97:BurpExtenderUtilities:27d1a1045e4d08620b8d174e4836d3fd50e7dc75'
     compile 'net.portswigger.burp.extender:burp-extender-api:1.7.22'
     compile 'com.google.code.gson:gson:+'
+    compile group: 'org.bouncycastle', name: 'bcprov-jdk15on', version: '1.61'
     compile group: 'org.apache.httpcomponents', name: 'httpclient', version: '4.5.6'
     compile group: 'commons-io', name: 'commons-io', version: '2.4'
     compile group: 'nu.studer', name: 'java-ordered-properties', version: '1.0.1'
-    testCompile files('/opt/BurpSuitePro/burpsuite_pro.jar')
+//    testCompile files('/opt/BurpSuitePro/burpsuite_pro.jar')
+    testCompile files('/home/corey/research/collaborator/reversing/burpsuite_pro_v2.0.08beta.jar')
 }
 
 tasks.withType(Jar) {

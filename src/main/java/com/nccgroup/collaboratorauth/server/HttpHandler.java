@@ -61,7 +61,7 @@ public class HttpHandler implements HttpRequestHandler {
 
     @Override
     public void handle(HttpRequest request, HttpResponse response, HttpContext context) throws IOException {
-        if(!(request instanceof BasicHttpEntityEnclosingRequest)){
+        if (!(request instanceof BasicHttpEntityEnclosingRequest)) {
             //TODO Ask PortSwigger if this is okay!
             response.setEntity(new StringEntity("<h1>Collaborator Authenticator</h1>" +
                     "Collaborator Authenticator is a tool designed to provide an authentication mechanism to the " +
@@ -80,49 +80,55 @@ public class HttpHandler implements HttpRequestHandler {
         CloseableHttpClient client = HttpClients.createDefault();
 
         try {
-            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-            ((BasicHttpEntityEnclosingRequest) request).getEntity().writeTo(byteArrayOutputStream);
-            String encodedRequest = Encryption.aesDecryptRequest(this.secret, byteArrayOutputStream.toByteArray());
-            String requestDecoded = new String(Base64.getDecoder().decode(encodedRequest));
+            try {
+                ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+                ((BasicHttpEntityEnclosingRequest) request).getEntity().writeTo(byteArrayOutputStream);
+                String encodedRequest = Encryption.aesDecryptRequest(this.secret, byteArrayOutputStream.toByteArray());
+                String requestDecoded = new String(Base64.getDecoder().decode(encodedRequest));
 
-            if (!requestDecoded.startsWith("/burpresults?biid=")) { //If request is not a valid collaborator request. (SSRF protection!)
-                response.setEntity(new StringEntity("The request does not look like a valid collaborator request!"));
-                response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
-                return;
-            }
-
-            //Make request to actual collaborator server
-            URI getURI = new URL((actualIsHttps ? "https://" : "http://") + actualAddress + ":" + actualPort
-                    + requestDecoded).toURI();
-            HttpGet getRequest = new HttpGet(getURI);
-            getRequest.addHeader("Connection", "close");
-            HttpResponse actualRequestResponse = client.execute(getRequest);
-            response.setStatusCode(actualRequestResponse.getStatusLine().getStatusCode());
-
-            String actualResponse = IOUtils.toString(actualRequestResponse.getEntity().getContent());
-
-            for (Header header : actualRequestResponse.getAllHeaders()) {
-                if (header.getName().equalsIgnoreCase("X-Collaborator-Version")
-                        || header.getName().equalsIgnoreCase("X-Collaborator-Time")) {
-                    response.addHeader(header);
+                if (!requestDecoded.startsWith("/burpresults?biid=")) { //If request is not a valid collaborator request. (SSRF protection!)
+                    throw new IllegalArgumentException("The request does not look like a valid collaborator polling request!");
                 }
-            }
 
-            if (actualRequestResponse.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
-                response.setEntity(new StringEntity(actualResponse));
-            } else {
-                if (logLevel.equalsIgnoreCase("debug") || logLevel.equalsIgnoreCase("error"))
-                    System.err.println("Actual collaborator server returned a " +
-                            actualRequestResponse.getStatusLine().getStatusCode() + " response!");
+                //Make request to actual collaborator server
+                URI getURI = new URL((actualIsHttps ? "https://" : "http://") + actualAddress + ":" + actualPort
+                        + requestDecoded).toURI();
+                HttpGet getRequest = new HttpGet(getURI);
+                getRequest.addHeader("Connection", "close");
+                HttpResponse actualRequestResponse = client.execute(getRequest);
+                final int actualStatus = actualRequestResponse.getStatusLine().getStatusCode();
+
+
+                if (actualRequestResponse.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
+                    String actualResponse = IOUtils.toString(actualRequestResponse.getEntity().getContent());
+                    response.setEntity(createEncryptedResponse(actualResponse));
+
+                    for (Header header : actualRequestResponse.getAllHeaders()) {
+                        if (header.getName().startsWith("X-Collaborator")) {
+                            response.addHeader(header);
+                        }
+                    }
+                } else {
+                    throw new Exception("The Collaborator server responded with a status code: " + actualStatus);
+                }
+            } catch (NoSuchAlgorithmException | InvalidKeySpecException | InvalidCipherTextException e) {
+                //Could not decrypt the request. The client probably used an invalid secret.
+                response.setStatusCode(HttpStatus.SC_UNAUTHORIZED);
+                response.setEntity(new StringEntity("The server could not decrypt the request. Is the secret correct?"));
+            } catch (IllegalArgumentException e) {
+                response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
+                response.setEntity(createEncryptedResponse(e.getMessage()));
             }
-        }catch (NoSuchAlgorithmException | InvalidKeySpecException | InvalidCipherTextException e) {
-            response.setStatusCode(HttpStatus.SC_UNAUTHORIZED);
-            return;
-        } catch (Exception e){
-            response.setEntity(new StringEntity(e.getMessage()));
-            response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
-        }finally {
+        }catch (Exception e){
+            //Log exception?
+            response.setStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR);
+        } finally {
             client.close();
         }
+    }
+
+    private ByteArrayEntity createEncryptedResponse(String message) throws NoSuchAlgorithmException, InvalidCipherTextException, InvalidKeySpecException {
+        byte[] encrypted = Encryption.aesEncryptRequest(this.secret, message);
+        return new ByteArrayEntity(encrypted);
     }
 }

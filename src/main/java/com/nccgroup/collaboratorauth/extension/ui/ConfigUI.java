@@ -220,7 +220,14 @@ public class ConfigUI extends JPanel implements LogListener {
 
             //Wait a 500ms for the server to start,
             //then trigger a polling request to test authentication...
-            new Thread(() -> callbacks.createBurpCollaboratorClientContext().fetchAllCollaboratorInteractions()).start();
+            new Thread(() -> {
+                try {
+                    callbacks.createBurpCollaboratorClientContext().fetchAllCollaboratorInteractions();
+                }catch (IllegalStateException e){
+                    //Collaborator is disabled?
+                    onServerStartFailure(e.getMessage());
+                }
+            }).start();
 
         }catch (Exception e){
             onServerStartFailure(e.getMessage());

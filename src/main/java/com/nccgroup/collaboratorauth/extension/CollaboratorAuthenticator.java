@@ -23,6 +23,7 @@ public class CollaboratorAuthenticator implements IBurpExtender, IExtensionState
     public static IBurpExtenderCallbacks callbacks;
     public static LogController logController;
     private ProxyService proxyService;
+    private InteractionLogger interactionLogger;
     private Preferences preferences;
 
     //UI
@@ -58,6 +59,8 @@ public class CollaboratorAuthenticator implements IBurpExtender, IExtensionState
         this.preferences.addSetting(PREF_SECRET, String.class, "Your Secret String");
         this.preferences.addSetting(PREF_ORIGINAL_COLLABORATOR_SETTINGS, String.class, "");
         this.preferences.addSetting(PREF_BLOCK_PUBLIC_COLLABORATOR, Boolean.class, true);
+
+        this.interactionLogger = new InteractionLogger(this);
 
         SwingUtilities.invokeLater(() -> {
             this.ui = new ExtensionUI(this);
