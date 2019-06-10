@@ -28,20 +28,33 @@ dependencies {
     compile group: 'org.apache.httpcomponents', name: 'httpclient', version: '4.5.6'
     compile group: 'commons-io', name: 'commons-io', version: '2.4'
     compile group: 'nu.studer', name: 'java-ordered-properties', version: '1.0.1'
-//    testCompile files('/opt/BurpSuitePro/burpsuite_pro.jar')
-    testCompile files('/home/corey/research/collaborator/reversing/burpsuite_pro_v2.0.08beta.jar')
+    testCompile files('/opt/BurpSuitePro/burpsuite_pro.jar')
 }
 
 tasks.withType(Jar) {
     destinationDir = file("$rootDir/releases")
 }
 
-task fatJar(type: Jar) {
+jar {
     manifest {
-        attributes (
-                'Main-Class': 'com.nccgroup.collaboratorauth.server.CollaboratorServer'
+        attributes(
+                'Main-Class': 'com.nccgroup.collaboratorauth.server.CollaboratorServer',
         )
     }
-    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+}
+
+task fatJar(type: Jar) {
+    manifest.from jar.manifest
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    } {
+        exclude "META-INF/*.SF"
+        exclude "META-INF/*.DSA"
+        exclude "META-INF/*.RSA"
+    }
     with jar
+}
+
+artifacts {
+    archives fatJar
 }

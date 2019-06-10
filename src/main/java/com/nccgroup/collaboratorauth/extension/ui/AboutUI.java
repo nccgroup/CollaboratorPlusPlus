@@ -4,7 +4,6 @@ import com.coreyd97.BurpExtenderUtilities.PanelBuilder;
 import com.coreyd97.BurpExtenderUtilities.Preferences;
 import com.nccgroup.collaboratorauth.extension.CollaboratorAuthenticator;
 import com.nccgroup.collaboratorauth.extension.Globals;
-import sun.misc.JavaLangAccess;
 
 import javax.swing.*;
 import javax.swing.text.Style;
@@ -22,7 +21,6 @@ import java.io.StringWriter;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.Buffer;
 
 public class AboutUI extends JPanel {
 
@@ -180,7 +178,7 @@ public class AboutUI extends JPanel {
 
         try {
             String introA = "Collaborator Abuse\n";
-            String introB = "By searching Shodan for response headers sent by Burp Collaborator, NCC Group discovered " +
+            String introB = "By searching Shodan.io for response headers sent by Burp Collaborator, NCC Group discovered " +
                     "the existence of 364 private collaborator servers. 160 of these were configured with SSL certificates, " +
                     "many of which with common name attributes suggesting ownership by leading security companies.\n\n" +
                     "Since Collaborator does not provide an authentication mechanism, a malicious user may " +
@@ -226,15 +224,15 @@ public class AboutUI extends JPanel {
                     new JComponent[]{explanationImage, explanationImage},
                     new JComponent[]{new JPanel(), null},
             }, new int[][]{
-                    new int[]{0,0},
-                    new int[]{0,0},
-                    new int[]{0,0},
-                    new int[]{0,0},
                     new int[]{1,1},
                     new int[]{1,1},
                     new int[]{1,1},
-                    new int[]{0,0},
-                    new int[]{0,0},
+                    new int[]{1,1},
+                    new int[]{1,1},
+                    new int[]{1,1},
+                    new int[]{1,1},
+                    new int[]{1,1},
+                    new int[]{1,1},
                     new int[]{100,100},
             }, PanelBuilder.Alignment.TOPMIDDLE, 0.25, 1D);
             return panel;

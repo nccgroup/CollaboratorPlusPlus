@@ -138,7 +138,6 @@ public class ProxyService implements HttpRequestHandler {
             post.addHeader("Connection", "close");
 
             logController.logDebug("Requesting interactions from authentication server for URI: " + decodedURI);
-            System.out.println(decodedURI.substring("/burpresults?biid=".length()));
 
             //Make request
             final HttpResponse actualServerResponse = client.execute(post);

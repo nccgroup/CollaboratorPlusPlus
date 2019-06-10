@@ -20,11 +20,6 @@ public class ExtensionUI extends JTabbedPane implements ITab {
         this.addTab("About", aboutPanel);
     }
 
-    private JPanel buildMainPanel(){
-        JPanel panel = new JPanel();
-        return panel;
-    }
-
     @Override
     public String getTabCaption() {
         return EXTENSION_NAME;

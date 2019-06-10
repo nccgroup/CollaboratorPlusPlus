@@ -132,6 +132,10 @@ public class CollaboratorAuthenticator implements IBurpExtender, IExtensionState
     @Override
     public void extensionUnloaded() {
         stopCollaboratorProxy();
+
+        if((boolean) this.preferences.getSetting(PREF_BLOCK_PUBLIC_COLLABORATOR)){
+            Utilities.unblockPublicCollaborator();
+        }
     }
 
     public Preferences getPreferences() {
