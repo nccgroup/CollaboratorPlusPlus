@@ -24,6 +24,8 @@ A few additional settings have been added to Collaborator Auth for convenience.
 Adds a DNS entry for *"burpcollaborator.net"* to *127.0.0.1* in Burp's hostname resolution config.
 
 
+
+
 ## Collaborator Auth - Server
 
 #### Running the Server
@@ -70,7 +72,10 @@ there is a reason otherwise.
 1. Edit the configuration file to enable ssl, point the server to the keystore and specify the passwords used.
 1. Run the server again and specify the configuration to be used `java -jar CollaboratorAuth.jar CollaboratorServer.properties`
 
-#### Recommended: Secure the *actual* Collaborator Server
+
+
+
+## Recommended: Secure the *actual* Collaborator Server
 
 To prevent polling of the Collaborator Server without the usage of Collaborator Auth, 
 the Burp Collaborators polling location must be restricted. 
