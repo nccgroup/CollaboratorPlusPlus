@@ -1,5 +1,5 @@
 group 'nccgroup'
-version '0.1-Beta'
+version '0.2-Beta'
 
 apply plugin: 'java'
 apply plugin: 'application'

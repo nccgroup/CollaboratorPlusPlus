@@ -30,7 +30,7 @@ public class CollaboratorServer {
     private static final String SECRET = "secret";
     private static final String LISTEN_PORT = "listen_port";
     private static final String LISTEN_ADDRESS = "listen_address";
-    private static final String LISTEN_SSL = "listen_ssl";
+    private static final String ENABLE_SSL = "enable_ssl";
     private static final String PRIVATE_KEY_PATH = "ssl_private_key_path";
     private static final String CERTIFICATE_PATH = "ssl_certificate_path";
     private static final String INTERMEDIATE_CERTIFICATE_PATH = "ssl_intermediate_certificate_path";
@@ -52,7 +52,7 @@ public class CollaboratorServer {
 
         listenPort = Integer.parseInt(properties.getProperty(LISTEN_PORT));
         InetAddress listenAddress = InetAddress.getByName(properties.getProperty(LISTEN_ADDRESS));
-        boolean listenSSL = Boolean.parseBoolean(properties.getProperty(LISTEN_SSL));
+        boolean enableSSL = Boolean.parseBoolean(properties.getProperty(ENABLE_SSL));
         logLevel = properties.getProperty(LOG_LEVEL);
 
         String secret = properties.getProperty(SECRET);
@@ -63,7 +63,7 @@ public class CollaboratorServer {
                 .setLocalAddress(listenAddress)
                 .registerHandler("*", new HttpHandler(actualAddress, actualPort, actualIsHttps, secret, logLevel));
 
-        if(listenSSL){
+        if(enableSSL){
             System.out.println("Starting server in HTTPS mode. Creating SSL context.");
             SSLContext sslContext;
             if(!properties.getProperty(PRIVATE_KEY_PATH).equals("")){
@@ -176,13 +176,13 @@ public class CollaboratorServer {
         defaultProperties.setProperty(COLLABORATOR_SERVER_PORT, "80");
         defaultProperties.setProperty(LISTEN_PORT, "5050");
         defaultProperties.setProperty(LISTEN_ADDRESS, "0.0.0.0");
-        defaultProperties.setProperty(LISTEN_SSL, "false");
+        defaultProperties.setProperty(ENABLE_SSL, "false");
         defaultProperties.setProperty(PRIVATE_KEY_PATH, "/certs/key.pem.pkcs8");
         defaultProperties.setProperty(CERTIFICATE_PATH, "/certs/cert.crt");
         defaultProperties.setProperty(INTERMEDIATE_CERTIFICATE_PATH, INTERMEDIATE_CERTIFICATE_DEFAULT);
         defaultProperties.setProperty(KEYSTORE_FILE, "/path/to/java/keystore");
-        defaultProperties.setProperty(KEYSTORE_PASSWORD, "KEYSTOREPASSWORD");
-        defaultProperties.setProperty(KEYSTORE_KEY_PASSWORD, "KEYSTOREPASSWORD_FOR_KEYS");
+        defaultProperties.setProperty(KEYSTORE_PASSWORD, "NEW_PASSWORD_FOR_KEYSTORE");
+        defaultProperties.setProperty(KEYSTORE_KEY_PASSWORD, "NEW_PASSWORD_FOR_PRIVATE_KEY");
 
         defaultProperties.setProperty(SECRET, "CHANGE_ME");
         defaultProperties.setProperty(LOG_LEVEL, "INFO");
