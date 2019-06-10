@@ -303,6 +303,7 @@ public class ConfigUI extends JPanel implements LogListener {
     
     @Override
     public void onInfo(String message) {
+        if(logArea == null) return;
         synchronized (logArea) {
             logArea.append("INFO: " + message + "\n");
         }
@@ -310,6 +311,7 @@ public class ConfigUI extends JPanel implements LogListener {
 
     @Override
     public void onError(String message) {
+        if(logArea == null) return;
         synchronized (logArea) {
             if (this.logLevel.equalsIgnoreCase("DEBUG"))
                 logArea.append("ERROR: " + message + "\n");
