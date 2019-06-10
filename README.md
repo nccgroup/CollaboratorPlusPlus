@@ -89,9 +89,6 @@ Burp Collaborator can be configured to listen to polling events only on the loca
 This can be done by changing Burp Collaborator's listening address for polling events to the loopback interface (127.0.0.1) or 
 using something like iptables to drop incoming requests.
 
-SHAPSHOT OF COLLABORATOR CONFIG
-
-
 ##### Option 2 - Only require usage of Collaborator Auth on external networks.  
 To allow Burp Collaborator to be used as normal when on the same network as the server, but require Collaborator Auth
 to be used when on an external network, Burp Collaborator can be configured to listen to polling events from
