@@ -44,7 +44,7 @@ public class Utilities {
                 }
             }
         }else{
-            logController.logInfo("Adding sink for the public collaborator server (just in case).");
+            logController.logInfo("Adding DNS sink for the public collaborator server: \"burpcollaborator.net\" .");
         }
         if(shouldAddEntry){
             resolutionElements.add(buildPublicCollaboratorSink());

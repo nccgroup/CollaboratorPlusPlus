@@ -185,10 +185,9 @@ public class ProxyService implements HttpRequestHandler {
             } else {
                 responseString = "The server could not process the request. " + responseString;
             }
-
         } catch (ClientProtocolException | SSLHandshakeException e) {
             //Make the invalid certificate error a bit more friendly!
-            if (e.getMessage().contains("unable to find valid certification path to requested target")) {
+            if (e.getMessage() != null && e.getMessage().contains("unable to find valid certification path to requested target")) {
                 responseString = "The SSL certificate provided by the server could not be verified. " +
                         "To override this, check the \"Ignore Certificate Errors\" option but proceed with caution!";
             } else {
@@ -199,7 +198,7 @@ public class ProxyService implements HttpRequestHandler {
         } catch (NoSuchAlgorithmException | InvalidCipherTextException | InvalidKeySpecException e) {
             responseString = "Could not decrypt the response sent by the server. Is our secret correct?";
         } finally {
-            client.close();
+            if(client != null) client.close();
         }
 
         logController.logDebug(responseString);

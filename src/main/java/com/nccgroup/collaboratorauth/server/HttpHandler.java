@@ -77,9 +77,7 @@ public class HttpHandler implements HttpRequestHandler {
             return;
         }
 
-        CloseableHttpClient client = HttpClients.createDefault();
-
-        try {
+        try (CloseableHttpClient client = HttpClients.createDefault()) {
             try {
                 ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
                 ((BasicHttpEntityEnclosingRequest) request).getEntity().writeTo(byteArrayOutputStream);
@@ -119,11 +117,9 @@ public class HttpHandler implements HttpRequestHandler {
                 response.setStatusCode(HttpStatus.SC_BAD_REQUEST);
                 response.setEntity(createEncryptedResponse(e.getMessage()));
             }
-        }catch (Exception e){
+        } catch (Exception e) {
             //Log exception?
             response.setStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR);
-        } finally {
-            client.close();
         }
     }
 
