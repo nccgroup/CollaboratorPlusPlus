@@ -1,5 +1,6 @@
 package com.nccgroup.collaboratorauth.extension.ui;
 
+import com.coreyd97.BurpExtenderUtilities.Alignment;
 import com.coreyd97.BurpExtenderUtilities.PanelBuilder;
 import com.coreyd97.BurpExtenderUtilities.Preferences;
 import com.nccgroup.collaboratorauth.extension.CollaboratorAuthenticator;
@@ -139,7 +140,7 @@ public class AboutUI extends JPanel {
             creditsPanel = panelBuilder.build(new JComponent[][]{
                     new JComponent[]{createdBy},
                     new JComponent[]{nccBranding}
-            }, PanelBuilder.Alignment.FILL, 1, 1);
+            }, Alignment.FILL, 1, 1);
         }catch (Exception e){
             creditsPanel = new JLabel("Could not build Panel");
         }
@@ -234,7 +235,7 @@ public class AboutUI extends JPanel {
                     new int[]{1,1},
                     new int[]{1,1},
                     new int[]{100,100},
-            }, PanelBuilder.Alignment.TOPMIDDLE, 0.25, 1D);
+            }, Alignment.TOPMIDDLE, 0.25, 1D);
             return panel;
         } catch (Exception e) {
             return new JLabel("Failed to build credits panel :(");

@@ -1,5 +1,6 @@
 package com.nccgroup.collaboratorauth.extension.ui;
 
+import com.coreyd97.BurpExtenderUtilities.Alignment;
 import com.coreyd97.BurpExtenderUtilities.ComponentGroup;
 import com.coreyd97.BurpExtenderUtilities.PanelBuilder;
 import com.nccgroup.collaboratorauth.extension.CollaboratorAuthenticator;
@@ -93,7 +94,7 @@ public class ConfigUI extends JPanel implements LogListener {
             }, new int[][]{
                     new int[]{1, 1},
                     new int[]{1, 1}
-            }, PanelBuilder.Alignment.FILL, 1, 1);
+            }, Alignment.FILL, 1, 1);
         } catch (Exception e) {
             checkboxComponentsPanel = new JLabel("Could not build checkbox components panel");
         }
@@ -166,7 +167,7 @@ public class ConfigUI extends JPanel implements LogListener {
                 }, new int[][]{
                     new int[]{0, 0},
                     new int[]{1 ,1},
-                }, PanelBuilder.Alignment.TOPMIDDLE, 1, 1);
+                }, Alignment.TOPMIDDLE, 1, 1);
         } catch (Exception e) {
             e.printStackTrace();
             JLabel error = new JLabel("Could not build the panel! :(");
