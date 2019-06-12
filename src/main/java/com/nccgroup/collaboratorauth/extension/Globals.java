@@ -18,7 +18,8 @@ public class Globals {
     public static final String PUBLIC_COLLABORATOR_HOSTNAME = "burpcollaborator.net";
     public static final String GITHUB_URL = "https://github.com/coreyd97/CollaboratorAuth";
     public static final String TWITTER_URL = "https://twitter.com/coreyd97";
-    public static final String NCC_TWITTER_URL = "https://twitter.com/NCCGroupplc";
+    public static final String IRSDL_TWITTER_URL = "https://twitter.com/irsdl";
+    public static final String NCC_TWITTER_URL = "https://twitter.com/NCCGroupInfosec";
 
 
 }

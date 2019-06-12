@@ -1,15 +1,52 @@
+## Collaborator Authenticator
+
+
+##### Background
+By searching Shodan.io for response headers sent by Burp Collaborator, 
+NCC Group discovered the existence of 364 private collaborator servers. 
+160 of these were configured with SSL certificates, many of which with 
+common name attributes suggesting ownership by leading security companies. 
+
+Since Collaborator does not provide an authentication mechanism, a malicious user may 
+use any of these discovered servers to exfiltrate stolen data from a compromised network by
+simply configuring Burp to use one of the discovered collaborator servers, generating a 
+collaborator address and making a request from the victim network with the stolen data
+contained within a POST request. 
+
+This tool aims to secure Collaborator servers by providing an authenticated proxy for polling 
+for Collaborator interactions, enabling server owners to limit unauthenticated 
+polling to the local network.
+
+##### Authentication Mechanism
+
+Collaborator Authenticator consists of two components, the server-side authentication server 
+which is responsible for validating incoming polling requests before passing them to the 
+Collaborator server, and the client extension which creates a local HTTP server and 
+sets itself as the polling address.
+
+When Burp requests the list of interactions received by the Collaborator server, the extension 
+encrypts the polling requests with the AES256-CBC encryption scheme, using the shared secret 
+to generate the encryption key. Provided the shared secret is correct, the authentication 
+server is able to decrypt the request and forward it to the Collaborator server
+to retrieve the interactions for the given Collaborator instance. The response is then 
+encrypted with the shared-secret before being sent back to the Burp client.
+ 
+By using the shared-secret to encrypt the transmission between the Burp client and the authentication server,
+the shared-secret does not need to be transmitted along with the request. This allows confidentiality to be
+maintained even in cases where HTTP communication must be used between the client and server. 
+
+
 ## Collaborator Auth - Client
 
-#### Running the Client
-1. Add the extension to Burp. 
-    * *Note: This is the same jar as the server.*
+##### Running the Client
+1. Add the extension to Burp: `CollaboratorAuth-CLIENT.jar`
 2. Specify the address and the port the Collaborator Auth Server is listening on within the extension config.
 3. Specify the secret configured by the server.
 4. Start the local server, this will also configure the collaborator settings within Burp for you.
 5. Optional: Run Burp's Collaborator health check to make sure everything is working.
 
 
-#### Additional Settings
+##### Additional Settings
 A few additional settings have been added to Collaborator Auth for convenience.
 
 **Use SSL:** Toggle the use of SSL between the client and server. 
@@ -28,15 +65,15 @@ Adds a DNS entry for *"burpcollaborator.net"* to *127.0.0.1* in Burp's hostname 
 
 ## Collaborator Auth - Server
 
-#### Running the Server
-1. Execute `java -jar CollaboratorAuth.jar` to generate the default configuration.
+##### Running the Server
+1. Execute `java -jar CollaboratorAuth-SERVER.jar` to generate the default configuration.
 2. Edit the generated file to point to your private collaborator instance and choose a suitable secret.
-3. Run the server again and specify the configuration to be used `java -jar CollaboratorAuth.jar YOURCONFIGFILE.properties`
+3. Run the server again and specify the configuration to be used `java -jar CollaboratorAuth-SERVER.jar YOURCONFIGFILE.properties`
 
 *Note: To allow HTTP and HTTPS requests to the Collaborator Auth server, create two copies of the configuration file, 
 configuring one for HTTP and one for HTTPS and run two instances of the Collaborator Auth server.*
 
-#### SSL Configuration
+##### SSL Configuration
 
 To enable the usage of SSL, generate a certificate for the server and use one of the below methods to configure the server.
 
@@ -70,26 +107,28 @@ there is a reason otherwise.
     <br/>`-destkeystore polling.jks -srckeystore polling.p12 -srcstoretype PKCS12 \ `
     <br/>`-srcstorepass PASS_FROM_PREVIOUS_STEP -alias polling`  
 1. Edit the configuration file to enable ssl, point the server to the keystore and specify the passwords used.
-1. Run the server again and specify the configuration to be used `java -jar CollaboratorAuth.jar CollaboratorServer.properties`
+1. Run the server again and specify the configuration to be used `java -jar CollaboratorAuth-SERVER.jar CollaboratorServer.properties`
 
 
 
 
-## Recommended: Secure the *actual* Collaborator Server
+#### Recommended: Secure the *actual* Collaborator Server
 
 To prevent polling of the Collaborator Server without the usage of Collaborator Auth, 
 the Burp Collaborators polling location must be restricted. 
 
 This may be done using your firewall, or by modifying the listening interface for polling events.
 
-##### Option 1 - Always require usage of Collaborator Auth.
+**Option 1 - Always require usage of Collaborator Auth.**
+
 Should you wish to force users of your Burp Collaborator instance to authenticate regardless of their network, 
 Burp Collaborator can be configured to listen to polling events only on the local machine (i.e. from Collaborator Auth).
 
 This can be done by changing Burp Collaborator's listening address for polling events to the loopback interface (127.0.0.1) or 
 using something like iptables to drop incoming requests.
 
-##### Option 2 - Only require usage of Collaborator Auth on external networks.  
+**Option 2 - Only require usage of Collaborator Auth on external networks.**
+  
 To allow Burp Collaborator to be used as normal when on the same network as the server, but require Collaborator Auth
 to be used when on an external network, Burp Collaborator can be configured to listen to polling events from
 internal addresses.

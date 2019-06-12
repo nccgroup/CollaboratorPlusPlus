@@ -34,6 +34,7 @@ import java.net.URI;
 import java.security.KeyManagementException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
 import java.security.spec.InvalidKeySpecException;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -195,7 +196,7 @@ public class ProxyService implements HttpRequestHandler {
                         ? e.getMessage()
                         : "SSL exception. Check you're targetting the correct protocol and the server is configured correctly.";
             }
-        } catch (NoSuchAlgorithmException | InvalidCipherTextException | InvalidKeySpecException e) {
+        } catch (NoSuchAlgorithmException | InvalidCipherTextException | InvalidKeySpecException | NoSuchProviderException e) {
             responseString = "Could not decrypt the response sent by the server. Is our secret correct?";
         } finally {
             if(client != null) client.close();

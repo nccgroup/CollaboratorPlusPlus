@@ -39,6 +39,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
 import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
 import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
 import java.util.Base64;
@@ -109,8 +110,10 @@ public class HttpHandler implements HttpRequestHandler {
                 } else {
                     throw new Exception("The Collaborator server responded with a status code: " + actualStatus);
                 }
-            } catch (NoSuchAlgorithmException | InvalidKeySpecException | InvalidCipherTextException e) {
+            } catch (NoSuchAlgorithmException | InvalidKeySpecException
+                    | InvalidCipherTextException | NoSuchProviderException e) {
                 //Could not decrypt the request. The client probably used an invalid secret.
+                e.printStackTrace();
                 response.setStatusCode(HttpStatus.SC_UNAUTHORIZED);
                 response.setEntity(new StringEntity("The server could not decrypt the request. Is the secret correct?"));
             } catch (IllegalArgumentException e) {
@@ -123,7 +126,7 @@ public class HttpHandler implements HttpRequestHandler {
         }
     }
 
-    private ByteArrayEntity createEncryptedResponse(String message) throws NoSuchAlgorithmException, InvalidCipherTextException, InvalidKeySpecException {
+    private ByteArrayEntity createEncryptedResponse(String message) throws NoSuchAlgorithmException, InvalidCipherTextException, InvalidKeySpecException, NoSuchProviderException {
         byte[] encrypted = Encryption.aesEncryptRequest(this.secret, message);
         return new ByteArrayEntity(encrypted);
     }

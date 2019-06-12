@@ -18,14 +18,15 @@ import javax.crypto.spec.SecretKeySpec;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
 import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
 
 public class Encryption {
 
-    private static BufferedBlockCipher buildCipher(boolean forEncryption, String secret, byte[] iv) throws NoSuchAlgorithmException, InvalidKeySpecException {
+    private static BufferedBlockCipher buildCipher(boolean forEncryption, String secret, byte[] iv) throws NoSuchAlgorithmException, InvalidKeySpecException, NoSuchProviderException {
         PBEKeySpec keySpec = new PBEKeySpec(secret.toCharArray(), "CollaboratorAuth".getBytes(), 50, 256);
-        SecretKeyFactory keyFactory = SecretKeyFactory.getInstance("PBEWITHSHA256AND128BITAES-CBC-BC");
+        SecretKeyFactory keyFactory = SecretKeyFactory.getInstance("PBEWITHSHA256AND128BITAES-CBC-BC", "BC");
         SecretKeySpec secretKey = new SecretKeySpec(keyFactory.generateSecret(keySpec).getEncoded(), "AES");
         final byte[] key = secretKey.getEncoded();
         KeyParameter keyParameter = new KeyParameter(key);
@@ -37,7 +38,7 @@ public class Encryption {
         return cipher;
     }
 
-    public static byte[] aesEncryptRequest(String secret, String request) throws InvalidKeySpecException, NoSuchAlgorithmException, InvalidCipherTextException {
+    public static byte[] aesEncryptRequest(String secret, String request) throws InvalidKeySpecException, NoSuchAlgorithmException, InvalidCipherTextException, NoSuchProviderException {
         final byte[] iv = new byte[16];
         new SecureRandom().nextBytes(iv);
         BufferedBlockCipher cipher = buildCipher(true, secret, iv);
@@ -50,7 +51,7 @@ public class Encryption {
     }
 
 
-    public static String aesDecryptRequest(String secret, byte[] encrypted) throws NoSuchAlgorithmException, InvalidKeySpecException, InvalidCipherTextException {
+    public static String aesDecryptRequest(String secret, byte[] encrypted) throws NoSuchAlgorithmException, InvalidKeySpecException, InvalidCipherTextException, NoSuchProviderException {
         final byte[] iv = Arrays.copyOfRange(encrypted, 0, 16);
         final byte[] data = Arrays.copyOfRange(encrypted, 16, encrypted.length);
         BufferedBlockCipher cipher = buildCipher(false,  secret, iv);

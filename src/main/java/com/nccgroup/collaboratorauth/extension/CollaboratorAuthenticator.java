@@ -30,7 +30,6 @@ public class CollaboratorAuthenticator implements IBurpExtender, IExtensionState
     private ExtensionUI ui;
 
     public CollaboratorAuthenticator(){
-        Security.addProvider(new BouncyCastleProvider());
         //Fix Darcula's issue with JSpinner UI.
         try {
             Class spinnerUI = Class.forName("com.bulenkov.darcula.ui.DarculaSpinnerUI");
@@ -44,6 +43,8 @@ public class CollaboratorAuthenticator implements IBurpExtender, IExtensionState
 
     @Override
     public void registerExtenderCallbacks(IBurpExtenderCallbacks callbacks) {
+        Security.addProvider(new BouncyCastleProvider());
+
         CollaboratorAuthenticator.callbacks = callbacks;
         CollaboratorAuthenticator.logController = new LogController();
 
@@ -81,7 +82,7 @@ public class CollaboratorAuthenticator implements IBurpExtender, IExtensionState
                 (Integer) this.preferences.getSetting(PREF_POLLING_PORT), null, null, null);
 
         startCollaboratorProxy((Integer) this.preferences.getSetting(PREF_LOCAL_PORT), destination,
-                (String) this.preferences.getSetting(PREF_SECRET));
+                ((String) this.preferences.getSetting(PREF_SECRET)).trim());
     }
 
     public void startCollaboratorProxy(Integer listenPort, URI destinationURI, String secret) throws IOException {

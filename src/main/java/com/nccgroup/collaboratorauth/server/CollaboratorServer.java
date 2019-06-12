@@ -7,15 +7,14 @@ import org.apache.http.impl.bootstrap.ServerBootstrap;
 import org.apache.http.ssl.SSLContexts;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
+import javax.crypto.SecretKeyFactory;
 import javax.net.ssl.SSLContext;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.InetAddress;
-import java.security.KeyStore;
-import java.security.PrivateKey;
-import java.security.Security;
+import java.security.*;
 import java.security.cert.Certificate;
 import java.util.ArrayList;
 import java.util.Properties;
@@ -45,7 +44,6 @@ public class CollaboratorServer {
     private String logLevel;
 
     private CollaboratorServer(Properties properties) throws Exception {
-        Security.addProvider(new BouncyCastleProvider());
         String actualAddress = properties.getProperty(COLLABORATOR_SERVER_ADDRESS);
         Integer actualPort = Integer.parseInt(properties.getProperty(COLLABORATOR_SERVER_PORT));
         boolean actualIsHttps = Boolean.parseBoolean(properties.getProperty(COLLABORATOR_SERVER_ISHTTPS));
@@ -55,7 +53,7 @@ public class CollaboratorServer {
         boolean enableSSL = Boolean.parseBoolean(properties.getProperty(ENABLE_SSL));
         logLevel = properties.getProperty(LOG_LEVEL);
 
-        String secret = properties.getProperty(SECRET);
+        String secret = properties.getProperty(SECRET).trim();
 
         ServerBootstrap serverBootstrap = ServerBootstrap.bootstrap()
                 .setConnectionReuseStrategy(new NoConnectionReuseStrategy())
@@ -101,8 +99,13 @@ public class CollaboratorServer {
             System.out.println("Starting server in HTTP mode.");
         }
 
-        if(logLevel.equalsIgnoreCase("debug") || logLevel.equalsIgnoreCase("error"))
-            serverBootstrap.setExceptionLogger(ex -> {System.out.println(ex.getMessage()); ex.printStackTrace();});
+        if(logLevel.equalsIgnoreCase("debug") || logLevel.equalsIgnoreCase("error")) {
+            System.out.println("Shared Secret: " + secret);
+            serverBootstrap.setExceptionLogger(ex -> {
+                System.out.println(ex.getMessage());
+                ex.printStackTrace();
+            });
+        }
 
         server = serverBootstrap.create();
     }
@@ -128,6 +131,9 @@ public class CollaboratorServer {
     }
 
     public static void main(String[] args) throws IOException {
+
+        checkBouncyCastle();
+
         OrderedProperties properties = getDefaultProperties();
         if(args.length == 0){
             //Create default properties file
@@ -166,6 +172,24 @@ public class CollaboratorServer {
             server.start();
         }catch (Exception e){
             e.printStackTrace();
+        }
+    }
+
+    private static void checkBouncyCastle(){
+        if(Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null){
+            int result = Security.addProvider(new BouncyCastleProvider());
+            if(result == -1){
+                System.err.println("Could not load Bouncy Castle Provider! Exiting...");
+                System.exit(0);
+            }
+
+            try{
+                SecretKeyFactory.getInstance("PBEWITHSHA256AND128BITAES-CBC-BC", "BC");
+            } catch (NoSuchAlgorithmException | NoSuchProviderException e) {
+                System.err.println("Could not instantiate the SecretKeyFactory, Bouncy Castle must not have loaded!");
+                e.printStackTrace();
+                System.exit(0);
+            }
         }
     }
 

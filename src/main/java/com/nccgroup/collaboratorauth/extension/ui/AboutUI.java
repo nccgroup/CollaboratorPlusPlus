@@ -71,11 +71,11 @@ public class AboutUI extends JPanel {
         BufferedImage twitterImage = loadImage("TwitterLogo.png");
         JButton twitterButton;
         if(twitterImage != null){
-            twitterButton = new JButton("Follow me on Twitter", new ImageIcon(scaleImageToWidth(twitterImage, 20)));
+            twitterButton = new JButton("Follow me (@CoreyD97) on Twitter", new ImageIcon(scaleImageToWidth(twitterImage, 20)));
             twitterButton.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
             twitterButton.setIconTextGap(7);
         }else{
-            twitterButton = new JButton("Follow me on Twitter");
+            twitterButton = new JButton("Follow me (@CoreyD97) on Twitter");
         }
 
         twitterButton.setMaximumSize(new Dimension(0, 10));
@@ -85,6 +85,24 @@ public class AboutUI extends JPanel {
                 Desktop.getDesktop().browse(new URI(Globals.TWITTER_URL));
             } catch (IOException | URISyntaxException e) {}
         });
+
+        JButton irsdlTwitterButton;
+        if(twitterImage != null){
+            irsdlTwitterButton = new JButton("Follow Soroush (@irsdl) on Twitter", new ImageIcon(scaleImageToWidth(twitterImage, 20)));
+            irsdlTwitterButton.setComponentOrientation(ComponentOrientation.RIGHT_TO_LEFT);
+            irsdlTwitterButton.setIconTextGap(7);
+        }else{
+            irsdlTwitterButton = new JButton("Follow Soroush (@irsdl) on Twitter");
+        }
+
+        irsdlTwitterButton.setMaximumSize(new Dimension(0, 10));
+
+        irsdlTwitterButton.addActionListener(actionEvent -> {
+            try {
+                Desktop.getDesktop().browse(new URI(Globals.IRSDL_TWITTER_URL));
+            } catch (IOException | URISyntaxException e) {}
+        });
+
 
         JButton nccTwitterButton;
         BufferedImage nccImage = loadImage("NCCGroup.png");
@@ -135,10 +153,15 @@ public class AboutUI extends JPanel {
         JLabel createdBy = new JLabel("Created by: Corey Arthur ( @CoreyD97 )");
         createdBy.setHorizontalAlignment(SwingConstants.CENTER);
         createdBy.setBorder(BorderFactory.createEmptyBorder(0,0,7,0));
+        JLabel ideaBy = new JLabel("Idea by: Soroush Dalili ( @irsdl )");
+        ideaBy.setHorizontalAlignment(SwingConstants.CENTER);
+        ideaBy.setBorder(BorderFactory.createEmptyBorder(0,0,7,0));
         JComponent creditsPanel;
         try {
             creditsPanel = panelBuilder.build(new JComponent[][]{
                     new JComponent[]{createdBy},
+                    new JComponent[]{ideaBy},
+                    new JComponent[]{nccBranding},
                     new JComponent[]{nccBranding}
             }, Alignment.FILL, 1, 1);
         }catch (Exception e){
@@ -179,21 +202,33 @@ public class AboutUI extends JPanel {
 
         try {
             String introA = "Collaborator Abuse\n";
-            String introB = "By searching Shodan.io for response headers sent by Burp Collaborator, NCC Group discovered " +
-                    "the existence of 364 private collaborator servers. 160 of these were configured with SSL certificates, " +
-                    "many of which with common name attributes suggesting ownership by leading security companies.\n\n" +
+            String introB = "By searching Shodan.io for response headers sent by Burp Collaborator, " +
+                    "NCC Group discovered the existence of 364 private collaborator servers. " +
+                    "160 of these were configured with SSL certificates, many of which with " +
+                    "common name attributes suggesting ownership by leading security companies.\n\n" +
                     "Since Collaborator does not provide an authentication mechanism, a malicious user may " +
-                    "use any of these discovered servers to exfiltrate stolen data from a compromised network.\n" +
+                    "use any of these discovered servers to exfiltrate stolen data from a compromised network by " +
+                    "simply configuring Burp to use one of the discovered collaborator servers, generating a " +
+                    "collaborator address and making a request from the victim network with the stolen data " +
+                    "contained within a POST request.\n\n" +
                     "This tool aims to secure Collaborator servers by providing an authenticated proxy for polling " +
-                    "for Collaborator interactions, enabling server owners to limit unauthenticated polling to the local network.\n\n";
+                    "for Collaborator interactions, enabling server owners to limit unauthenticated " +
+                    "polling to the local network.\n\n";
             String explanationA = "Authentication Mechanism\n";
-            String explanationB = "Collaborator Authenticator consists of two components, the server-side authentication server which " +
-                    "is responsible for validating incoming polling requests before passing them to the Collaborator server, and " +
-                    "the client extension which creates a local HTTP server and sets itself as the polling address.\n\n" +
+            String explanationB = "Collaborator Authenticator consists of two components, the server-side authentication server " +
+                    "which is responsible for validating incoming polling requests before passing them to the " +
+                    "Collaborator server, and the client extension which creates a local HTTP server and " +
+                    "sets itself as the polling address.\n\n" +
                     "When Burp requests the list of interactions received by the Collaborator server, the extension " +
-                    "forwards the polling requests sent by burp along with the pre-shared secret to the authentication secret. " +
-                    "Provided the pre-shared secret is correct, the authentication server will query the Collaborator server and " +
-                    "respond with the interactions for the given Collaborator instance.";
+                    "encrypts the polling requests with the AES256-CBC encryption scheme, using the shared secret " +
+                    "to generate the encryption key. Provided the shared secret is correct, the authentication " +
+                    "server is able to decrypt the request and forward it to the Collaborator server " +
+                    "to retrieve the interactions for the given Collaborator instance. The response is then " +
+                    "encrypted with the shared-secret before being sent back to the Burp client.\n\n" +
+                    "By using the shared-secret to encrypt the transmission between the Burp client and the authentication server,\n" +
+                    "the shared-secret does not need to be transmitted along with the request. This allows confidentiality to be\n" +
+                    "maintained even in cases where HTTP communication must be used between the client and server.";
+
 
             String[] sections = new String[]{introA, introB, explanationA, explanationB};
             Style[] styles = new Style[]{bold, null, bold, null, bold, null, null, italics};
@@ -219,12 +254,14 @@ public class AboutUI extends JPanel {
                     new JComponent[]{separator, separator},
                     new JComponent[]{separatorPadding, separatorPadding},
                     new JComponent[]{creditsPanel, twitterButton},
+                    new JComponent[]{creditsPanel, irsdlTwitterButton},
                     new JComponent[]{creditsPanel, nccTwitterButton},
                     new JComponent[]{creditsPanel, viewOnGithubButton},
                     new JComponent[]{aboutContent, aboutContent},
                     new JComponent[]{explanationImage, explanationImage},
                     new JComponent[]{new JPanel(), null},
             }, new int[][]{
+                    new int[]{1,1},
                     new int[]{1,1},
                     new int[]{1,1},
                     new int[]{1,1},
