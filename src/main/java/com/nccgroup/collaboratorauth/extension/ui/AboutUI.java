@@ -225,8 +225,8 @@ public class AboutUI extends JPanel {
                     "server is able to decrypt the request and forward it to the Collaborator server " +
                     "to retrieve the interactions for the given Collaborator instance. The response is then " +
                     "encrypted with the shared-secret before being sent back to the Burp client.\n\n" +
-                    "By using the shared-secret to encrypt the transmission between the Burp client and the authentication server,\n" +
-                    "the shared-secret does not need to be transmitted along with the request. This allows confidentiality to be\n" +
+                    "By using the shared-secret to encrypt the transmission between the Burp client and the authentication server, " +
+                    "the shared-secret does not need to be transmitted along with the request. This allows confidentiality to be " +
                     "maintained even in cases where HTTP communication must be used between the client and server.";
 
 
