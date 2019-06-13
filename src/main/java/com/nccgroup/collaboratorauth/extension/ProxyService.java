@@ -10,7 +10,9 @@ import org.apache.http.HttpStatus;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
-import org.apache.http.conn.ssl.*;
+import org.apache.http.conn.ssl.DefaultHostnameVerifier;
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
+import org.apache.http.conn.ssl.TrustAllStrategy;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.NoConnectionReuseStrategy;
@@ -23,19 +25,21 @@ import org.apache.http.protocol.HttpRequestHandler;
 import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.ssl.TrustStrategy;
 import org.apache.http.util.EntityUtils;
-import org.bouncycastle.crypto.InvalidCipherTextException;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLHandshakeException;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.Inet4Address;
 import java.net.URI;
-import java.security.KeyManagementException;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
+import java.security.*;
 import java.security.spec.InvalidKeySpecException;
+import java.security.spec.InvalidParameterSpecException;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.concurrent.TimeUnit;
@@ -75,6 +79,7 @@ public class ProxyService implements HttpRequestHandler {
                 .registerHandler("*", this);
 
         serverBootstrap.setExceptionLogger(ex -> {
+            logController.logError("Uncaught Exception...");
             logController.logError(ex.getMessage());
             logController.logError(ex);
             for (ProxyServiceListener listener : this.listeners) {
@@ -196,8 +201,15 @@ public class ProxyService implements HttpRequestHandler {
                         ? e.getMessage()
                         : "SSL exception. Check you're targetting the correct protocol and the server is configured correctly.";
             }
-        } catch (NoSuchAlgorithmException | InvalidCipherTextException | InvalidKeySpecException | NoSuchProviderException e) {
-            responseString = "Could not decrypt the response sent by the server. Is our secret correct?";
+//        } catch (InvalidCipherTextException e) {
+//            responseString = "Could not decrypt the response sent by the server. Is our secret correct?";
+        } catch (NoSuchAlgorithmException | InvalidKeySpecException | NoSuchPaddingException
+                | InvalidKeyException | IllegalBlockSizeException | InvalidAlgorithmParameterException
+                | InvalidParameterSpecException | BadPaddingException e) {
+
+            StringWriter sw = new StringWriter();
+            e.printStackTrace(new PrintWriter(sw));
+            responseString = sw.toString();
         } finally {
             if(client != null) client.close();
         }

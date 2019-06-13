@@ -29,44 +29,25 @@ dependencies {
     compile group: 'org.apache.httpcomponents', name: 'httpclient', version: '4.5.6'
     compile group: 'commons-io', name: 'commons-io', version: '2.4'
     compile group: 'nu.studer', name: 'java-ordered-properties', version: '1.0.1'
+    compile group: 'org.bouncycastle', name: 'bcprov-jdk15on', version: '1.62'
     testCompile files('/opt/BurpSuitePro/burpsuite_pro.jar')
-    includeUnexplodedLib group: 'org.bouncycastle', name: 'bcprov-jdk15on', version: '1.61'
 }
 
 tasks.withType(Jar){
     destinationDir = file("$rootDir/releases")
 }
 
-task clientJar(type: Jar){
-    baseName "CollaboratorAuth-CLIENT"
-    from{
-        (configurations.runtime).collect {
-            it.isDirectory() ? it : zipTree(it)
-        }
+jar{
+    manifest {
+        attributes(
+                "Main-Class": "com.nccgroup.collaboratorauth.server.CollaboratorServer"
+        )
+    }
+    from {
+        (configurations.compile).collect { it.isDirectory() ? it : zipTree(it) }
     }{
         exclude "META-INF/*.SF"
         exclude "META-INF/*.DSA"
         exclude "META-INF/*.RSA"
     }
 }
-
-task serverJar(type: Jar){
-    baseName "CollaboratorAuth-SERVER"
-    manifest {
-        attributes(
-                'Main-Class': 'com.nccgroup.collaboratorauth.server.Launcher',
-        )
-    }
-
-    from{
-        (configurations.runtime - configurations.includeUnexplodedLib).collect {
-            it.isDirectory() ? it : zipTree(it)
-        }
-    }
-
-    into('lib'){
-        from configurations.includeUnexplodedLib
-    }
-}
-
-assemble.dependsOn(clientJar, serverJar)

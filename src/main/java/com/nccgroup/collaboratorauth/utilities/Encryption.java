@@ -1,65 +1,53 @@
 package com.nccgroup.collaboratorauth.utilities;
 
-import org.bouncycastle.crypto.BufferedBlockCipher;
-import org.bouncycastle.crypto.CipherParameters;
-import org.bouncycastle.crypto.InvalidCipherTextException;
-import org.bouncycastle.crypto.engines.AESEngine;
-import org.bouncycastle.crypto.modes.CBCBlockCipher;
-import org.bouncycastle.crypto.paddings.BlockCipherPadding;
-import org.bouncycastle.crypto.paddings.PKCS7Padding;
-import org.bouncycastle.crypto.paddings.PaddedBufferedBlockCipher;
-import org.bouncycastle.crypto.params.KeyParameter;
-import org.bouncycastle.crypto.params.ParametersWithIV;
-import org.bouncycastle.util.Arrays;
 
-import javax.crypto.SecretKeyFactory;
+import javax.crypto.*;
+import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.security.AlgorithmParameters;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
-import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
+import java.security.spec.InvalidParameterSpecException;
+import java.security.spec.KeySpec;
+import java.util.Arrays;
 
 public class Encryption {
 
-    private static BufferedBlockCipher buildCipher(boolean forEncryption, String secret, byte[] iv) throws NoSuchAlgorithmException, InvalidKeySpecException, NoSuchProviderException {
-        PBEKeySpec keySpec = new PBEKeySpec(secret.toCharArray(), "CollaboratorAuth".getBytes(), 50, 256);
-        SecretKeyFactory keyFactory = SecretKeyFactory.getInstance("PBEWITHSHA256AND128BITAES-CBC-BC", "BC");
-        SecretKeySpec secretKey = new SecretKeySpec(keyFactory.generateSecret(keySpec).getEncoded(), "AES");
-        final byte[] key = secretKey.getEncoded();
-        KeyParameter keyParameter = new KeyParameter(key);
-        CipherParameters cipherParameters = new ParametersWithIV(keyParameter, iv);
+    private static SecretKey generateKey(String secret) throws NoSuchAlgorithmException, InvalidKeySpecException {
+        SecretKeyFactory keyFactory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+        KeySpec keySpec = new PBEKeySpec(secret.toCharArray(), "CollaboratorAuth".getBytes(), 128, 256);
+        SecretKey tmpSecret = keyFactory.generateSecret(keySpec);
 
-        BlockCipherPadding padding = new PKCS7Padding();
-        BufferedBlockCipher cipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(new AESEngine()), padding);
-        cipher.init(forEncryption, cipherParameters);
-        return cipher;
-    }
-
-    public static byte[] aesEncryptRequest(String secret, String request) throws InvalidKeySpecException, NoSuchAlgorithmException, InvalidCipherTextException, NoSuchProviderException {
-        final byte[] iv = new byte[16];
-        new SecureRandom().nextBytes(iv);
-        BufferedBlockCipher cipher = buildCipher(true, secret, iv);
-
-        byte[] plainData = request.getBytes();
-        byte[] output = new byte[cipher.getOutputSize(request.getBytes().length)];
-        int len = cipher.processBytes(plainData, 0, plainData.length, output, 0);
-        len += cipher.doFinal(output, len);
-        return Arrays.concatenate(iv, output);
+        return new SecretKeySpec(tmpSecret.getEncoded(), "AES");
     }
 
 
-    public static String aesDecryptRequest(String secret, byte[] encrypted) throws NoSuchAlgorithmException, InvalidKeySpecException, InvalidCipherTextException, NoSuchProviderException {
-        final byte[] iv = Arrays.copyOfRange(encrypted, 0, 16);
-        final byte[] data = Arrays.copyOfRange(encrypted, 16, encrypted.length);
-        BufferedBlockCipher cipher = buildCipher(false,  secret, iv);
+    public static byte[] aesEncryptRequest(String secret, String request) throws InvalidKeySpecException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidParameterSpecException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        SecretKey secretKey = generateKey(secret);
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey);
+        AlgorithmParameters params = cipher.getParameters();
+        byte[] iv = params.getParameterSpec(IvParameterSpec.class).getIV();
+        byte[] cipherText = cipher.doFinal(request.getBytes());
 
-        byte[] output = new byte[cipher.getOutputSize(data.length)];
-        int len = cipher.processBytes(data, 0, data.length, output, 0);
-        len += cipher.doFinal(output, len);
+        byte[] cipherTextWithIv = new byte[cipherText.length+iv.length];
+        System.arraycopy(iv, 0, cipherTextWithIv, 0, iv.length);
+        System.arraycopy(cipherText, 0, cipherTextWithIv, iv.length, cipherText.length);
+        return cipherTextWithIv;
+    }
 
-        return new String(Arrays.copyOfRange(output, 0, len));
+
+    public static String aesDecryptRequest(String secret, byte[] encryptedWithIv) throws InvalidKeySpecException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException, InvalidAlgorithmParameterException {
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        SecretKey secretKey = generateKey(secret);
+        byte[] iv = Arrays.copyOfRange(encryptedWithIv, 0, 16);
+        byte[] cipherText = Arrays.copyOfRange(encryptedWithIv, 16, encryptedWithIv.length);
+        cipher.init(Cipher.DECRYPT_MODE, secretKey, new IvParameterSpec(iv));
+        String plaintext = new String(cipher.doFinal(cipherText));
+
+        return plaintext;
     }
 }

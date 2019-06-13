@@ -5,16 +5,15 @@ import org.apache.http.impl.NoConnectionReuseStrategy;
 import org.apache.http.impl.bootstrap.HttpServer;
 import org.apache.http.impl.bootstrap.ServerBootstrap;
 import org.apache.http.ssl.SSLContexts;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
-import javax.crypto.SecretKeyFactory;
 import javax.net.ssl.SSLContext;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.InetAddress;
-import java.security.*;
+import java.security.KeyStore;
+import java.security.PrivateKey;
 import java.security.cert.Certificate;
 import java.util.ArrayList;
 import java.util.Properties;
@@ -130,9 +129,7 @@ public class CollaboratorServer {
         return SSLContexts.custom().loadKeyMaterial(keyStore, password).build();
     }
 
-    public static void main(String[] args) throws IOException {
-
-        checkBouncyCastle();
+    public static void main(String[] args) throws Exception {
 
         OrderedProperties properties = getDefaultProperties();
         if(args.length == 0){
@@ -172,24 +169,6 @@ public class CollaboratorServer {
             server.start();
         }catch (Exception e){
             e.printStackTrace();
-        }
-    }
-
-    private static void checkBouncyCastle(){
-        if(Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null){
-            int result = Security.addProvider(new BouncyCastleProvider());
-            if(result == -1){
-                System.err.println("Could not load Bouncy Castle Provider! Exiting...");
-                System.exit(0);
-            }
-
-            try{
-                SecretKeyFactory.getInstance("PBEWITHSHA256AND128BITAES-CBC-BC", "BC");
-            } catch (NoSuchAlgorithmException | NoSuchProviderException e) {
-                System.err.println("Could not instantiate the SecretKeyFactory, Bouncy Castle must not have loaded!");
-                e.printStackTrace();
-                System.exit(0);
-            }
         }
     }
 

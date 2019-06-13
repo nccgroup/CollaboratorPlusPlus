@@ -29,6 +29,9 @@ import org.bouncycastle.crypto.params.KeyParameter;
 import org.bouncycastle.crypto.params.ParametersWithIV;
 import org.bouncycastle.util.Arrays;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -38,10 +41,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
+import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
+import java.security.spec.InvalidParameterSpecException;
 import java.util.Base64;
 
 public class HttpHandler implements HttpRequestHandler {
@@ -76,6 +81,11 @@ public class HttpHandler implements HttpRequestHandler {
                     "developed by PortSwigger.<br/>", ContentType.TEXT_HTML));
             response.setStatusCode(HttpStatus.SC_OK);
             return;
+        }
+
+        if(logLevel.equalsIgnoreCase("debug") || logLevel.equalsIgnoreCase("error")) {
+            System.out.println("Retrieved request: ");
+            System.out.println(((BasicHttpEntityEnclosingRequest) request).getEntity());
         }
 
         try (CloseableHttpClient client = HttpClients.createDefault()) {
@@ -124,9 +134,13 @@ public class HttpHandler implements HttpRequestHandler {
             //Log exception?
             response.setStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR);
         }
+
+        if(logLevel.equalsIgnoreCase("debug") || logLevel.equalsIgnoreCase("error")) {
+            System.out.println("Response: ");
+        }
     }
 
-    private ByteArrayEntity createEncryptedResponse(String message) throws NoSuchAlgorithmException, InvalidCipherTextException, InvalidKeySpecException, NoSuchProviderException {
+    private ByteArrayEntity createEncryptedResponse(String message) throws NoSuchAlgorithmException, InvalidKeySpecException, IllegalBlockSizeException, InvalidKeyException, BadPaddingException, InvalidParameterSpecException, NoSuchPaddingException {
         byte[] encrypted = Encryption.aesEncryptRequest(this.secret, message);
         return new ByteArrayEntity(encrypted);
     }

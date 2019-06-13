@@ -6,16 +6,14 @@ import burp.IExtensionStateListener;
 import com.coreyd97.BurpExtenderUtilities.DefaultGsonProvider;
 import com.coreyd97.BurpExtenderUtilities.Preferences;
 import com.nccgroup.collaboratorauth.extension.ui.ExtensionUI;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-
-import static com.nccgroup.collaboratorauth.extension.Globals.*;
 
 import javax.swing.*;
 import java.io.IOException;
 import java.net.Inet4Address;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.security.Security;
+
+import static com.nccgroup.collaboratorauth.extension.Globals.*;
 
 public class CollaboratorAuthenticator implements IBurpExtender, IExtensionStateListener {
 
@@ -43,7 +41,6 @@ public class CollaboratorAuthenticator implements IBurpExtender, IExtensionState
 
     @Override
     public void registerExtenderCallbacks(IBurpExtenderCallbacks callbacks) {
-        Security.addProvider(new BouncyCastleProvider());
 
         CollaboratorAuthenticator.callbacks = callbacks;
         CollaboratorAuthenticator.logController = new LogController();

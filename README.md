@@ -39,7 +39,8 @@ maintained even in cases where HTTP communication must be used between the clien
 ## Collaborator Auth - Client
 
 ##### Running the Client
-1. Add the extension to Burp: `CollaboratorAuth-CLIENT.jar`
+1. Add the extension to Burp
+    - Note: This is the same JAR as the server.
 2. Specify the address and the port the Collaborator Auth Server is listening on within the extension config.
 3. Specify the secret configured by the server.
 4. Start the local server, this will also configure the collaborator settings within Burp for you.
@@ -66,7 +67,8 @@ Adds a DNS entry for *"burpcollaborator.net"* to *127.0.0.1* in Burp's hostname 
 ## Collaborator Auth - Server
 
 ##### Running the Server
-1. Execute `java -jar CollaboratorAuth-SERVER.jar` to generate the default configuration.
+1. Execute `java -jar CollaboratorAuth.jar` to generate the default configuration.
+    - Note: This is the same JAR as the client.
 2. Edit the generated file to point to your private collaborator instance and choose a suitable secret.
 3. Run the server again and specify the configuration to be used `java -jar CollaboratorAuth-SERVER.jar YOURCONFIGFILE.properties`
 
