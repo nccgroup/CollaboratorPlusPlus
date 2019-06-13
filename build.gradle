@@ -33,12 +33,8 @@ dependencies {
     includeUnexplodedLib group: 'org.bouncycastle', name: 'bcprov-jdk15on', version: '1.61'
 }
 
-task jar(type: Jar, overwrite: true) {
+tasks.withType(Jar){
     destinationDir = file("$rootDir/releases")
-    doLast() {
-        clientJar
-        serverJar
-    }
 }
 
 task clientJar(type: Jar){
@@ -72,3 +68,5 @@ task serverJar(type: Jar){
         from configurations.includeUnexplodedLib
     }
 }
+
+assemble.dependsOn(clientJar, serverJar)
