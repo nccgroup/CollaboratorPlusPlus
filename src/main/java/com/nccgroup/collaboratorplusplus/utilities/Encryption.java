@@ -1,4 +1,4 @@
-package com.nccgroup.collaboratorauth.utilities;
+package com.nccgroup.collaboratorplusplus.utilities;
 
 
 import javax.crypto.*;

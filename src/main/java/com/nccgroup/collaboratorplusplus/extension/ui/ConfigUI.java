@@ -1,12 +1,13 @@
-package com.nccgroup.collaboratorauth.extension.ui;
+package com.nccgroup.collaboratorplusplus.extension.ui;
 
 import com.coreyd97.BurpExtenderUtilities.Alignment;
 import com.coreyd97.BurpExtenderUtilities.ComponentGroup;
 import com.coreyd97.BurpExtenderUtilities.PanelBuilder;
-import com.nccgroup.collaboratorauth.extension.CollaboratorAuthenticator;
-import com.nccgroup.collaboratorauth.extension.LogListener;
-import com.nccgroup.collaboratorauth.extension.ProxyServiceListener;
-import com.nccgroup.collaboratorauth.extension.Utilities;
+import com.nccgroup.collaboratorplusplus.extension.CollaboratorPlusPlus;
+import com.nccgroup.collaboratorplusplus.extension.LogListener;
+import com.nccgroup.collaboratorplusplus.extension.ProxyServiceListener;
+import com.nccgroup.collaboratorplusplus.extension.Utilities;
+import com.nccgroup.collaboratorplusplus.utilities.LogManager;
 import org.apache.http.impl.bootstrap.HttpServer;
 
 import javax.swing.*;
@@ -14,24 +15,28 @@ import javax.swing.text.DefaultCaret;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.concurrent.TimeUnit;
 
-import static com.nccgroup.collaboratorauth.extension.CollaboratorAuthenticator.callbacks;
-import static com.nccgroup.collaboratorauth.extension.CollaboratorAuthenticator.logController;
-import static com.nccgroup.collaboratorauth.extension.Globals.*;
+import static com.nccgroup.collaboratorplusplus.extension.CollaboratorPlusPlus.callbacks;
+import static com.nccgroup.collaboratorplusplus.extension.CollaboratorPlusPlus.logManager;
+import static com.nccgroup.collaboratorplusplus.extension.Globals.*;
 
-public class ConfigUI extends JPanel implements LogListener {
+public class ConfigUI extends JPanel implements LogListener, ProxyServiceListener {
 
-    private final CollaboratorAuthenticator extension;
+    private final CollaboratorPlusPlus extension;
     private JToggleButton startStopButton;
     private JSpinner localPortSpinner;
     private JSpinner remotePortSpinner;
-    private JTextField remoteAddressField;
+    private JTextField collaboratorPollingField;
     private JTextField collaboratorLocationField;
     private JCheckBox sslEnabledCheckbox;
     private JCheckBox trustSelfSignedCheckbox;
     private JCheckBox hostnameVerificationCheckbox;
     private JCheckBox blockPublicCollaborator;
+    private JCheckBox proxyRequestsWithBurp;
+    private JCheckBox enableAuthentication;
     private JTextArea secretArea;
     private JLabel statusLabel;
     private JTextArea logArea;
@@ -39,10 +44,11 @@ public class ConfigUI extends JPanel implements LogListener {
     private String logLevel;
     private boolean serverStarting;
 
-    public ConfigUI(CollaboratorAuthenticator extension){
-        CollaboratorAuthenticator.logController.addLogListener(this);
+    public ConfigUI(CollaboratorPlusPlus extension){
+        CollaboratorPlusPlus.logManager.addLogListener(this);
         this.setLayout(new BorderLayout());
         this.extension = extension;
+        this.extension.addProxyServiceListener(this);
         JPanel panel = buildMainPanel();
         this.add(panel, BorderLayout.CENTER);
         this.addMouseListener(new MouseAdapter() {
@@ -61,13 +67,13 @@ public class ConfigUI extends JPanel implements LogListener {
     public JPanel buildMainPanel(){
         PanelBuilder panelBuilder = new PanelBuilder(extension.getPreferences());
         ComponentGroup configGroup = panelBuilder.createComponentGroup("Configuration");
-        localPortSpinner = (JSpinner) configGroup.addPreferenceComponent(PREF_LOCAL_PORT, "Local Port");
+        localPortSpinner = configGroup.addPreferenceComponent(PREF_LOCAL_PORT, "Local Port");
         ((SpinnerNumberModel) localPortSpinner.getModel()).setMinimum(0);
         ((SpinnerNumberModel) localPortSpinner.getModel()).setMaximum(65535);
         localPortSpinner.setEditor(new JSpinner.NumberEditor(localPortSpinner, "#"));
-        collaboratorLocationField = (JTextField) configGroup.addPreferenceComponent(PREF_COLLABORATOR_ADDRESS, "Collaborator Location");
-        remoteAddressField = (JTextField) configGroup.addPreferenceComponent(PREF_POLLING_ADDRESS, "Collaborator Polling Location");
-        remotePortSpinner = (JSpinner) configGroup.addPreferenceComponent(PREF_POLLING_PORT, "Collaborator Auth Port");
+        collaboratorLocationField = configGroup.addPreferenceComponent(PREF_COLLABORATOR_ADDRESS, "Collaborator Location");
+        collaboratorPollingField = configGroup.addPreferenceComponent(PREF_POLLING_ADDRESS, "Collaborator Polling Location");
+        remotePortSpinner = configGroup.addPreferenceComponent(PREF_POLLING_PORT, "Polling Port");
         ((SpinnerNumberModel) remotePortSpinner.getModel()).setMinimum(0);
         ((SpinnerNumberModel) remotePortSpinner.getModel()).setMaximum(65535);
         remotePortSpinner.setEditor(new JSpinner.NumberEditor(remotePortSpinner, "#"));
@@ -77,6 +83,8 @@ public class ConfigUI extends JPanel implements LogListener {
         trustSelfSignedCheckbox = panelBuilder.createPreferenceCheckBox(PREF_IGNORE_CERTIFICATE_ERRORS, "Ignore Certificate Errors");
         hostnameVerificationCheckbox = panelBuilder.createPreferenceCheckBox(PREF_SSL_HOSTNAME_VERIFICATION, "Enable SSL Hostname Verification");
         blockPublicCollaborator = panelBuilder.createPreferenceCheckBox(PREF_BLOCK_PUBLIC_COLLABORATOR, "Block Public Collaborator Server");
+        proxyRequestsWithBurp = panelBuilder.createPreferenceCheckBox(PREF_PROXY_REQUESTS_WITH_BURP, "Proxy Polling Requests with Burp");
+
         blockPublicCollaborator.addActionListener(actionEvent -> {
             if(blockPublicCollaborator.isSelected()) Utilities.blockPublicCollaborator();
             else Utilities.unblockPublicCollaborator();
@@ -90,7 +98,7 @@ public class ConfigUI extends JPanel implements LogListener {
         try {
             checkboxComponentsPanel = panelBuilder.build(new JComponent[][]{
                     new JComponent[]{sslEnabledCheckbox, trustSelfSignedCheckbox},
-                    new JComponent[]{hostnameVerificationCheckbox, blockPublicCollaborator}
+                    new JComponent[]{hostnameVerificationCheckbox, blockPublicCollaborator},
             }, new int[][]{
                     new int[]{1, 1},
                     new int[]{1, 1}
@@ -107,22 +115,37 @@ public class ConfigUI extends JPanel implements LogListener {
         statusLabel.setHorizontalAlignment(SwingConstants.CENTER);
         controlGroup.addComponent(statusLabel);
 
+        controlGroup.addPreferenceComponent(PREF_AUTO_START, "Start Automatically on Load");
         startStopButton = controlGroup.addToggleButton("Start", actionEvent -> {
             JToggleButton thisButton = (JToggleButton) actionEvent.getSource();
             SwingUtilities.invokeLater(() -> {
                 if(thisButton.isSelected()){
-                    startServer();
+                    try {
+                        this.extension.startCollaboratorProxy();
+                    } catch (IOException | URISyntaxException e) {
+                        e.printStackTrace();
+                    }
                 }else{
-                    stopServer();
+                    this.extension.stopCollaboratorProxy();
                 }
             });
         });
 
-        ComponentGroup secretGroup = panelBuilder.createComponentGroup("Shared Secret");
+        ComponentGroup secretGroup = panelBuilder.createComponentGroup("Collaborator Authentication");
+        enableAuthentication = panelBuilder.createPreferenceCheckBox(PREF_USE_AUTHENTICATION, "Enable Authentication");
+        enableAuthentication.setBorder(BorderFactory.createEmptyBorder(0,0,10,0));
+        enableAuthentication.addActionListener(e -> {
+            secretArea.setEnabled(enableAuthentication.isSelected());
+        });
+        GridBagConstraints gbc = secretGroup.generateNextConstraints();
+        gbc.weighty = 0;
+        secretGroup.addComponent(enableAuthentication, gbc);
+
         secretArea = panelBuilder.createPreferenceTextArea(PREF_SECRET);
         secretArea.setLineWrap(true);
+        secretArea.setEnabled(extension.getPreferences().getSetting(PREF_USE_AUTHENTICATION));
         JScrollPane secretScrollPane = new JScrollPane(secretArea);
-        secretScrollPane.setBorder(null);
+        secretScrollPane.setBorder(BorderFactory.createTitledBorder(BorderFactory.createLineBorder(Color.GRAY), "Shared Secret"));
         secretGroup.addComponent(secretScrollPane);
 
         ComponentGroup logGroup = panelBuilder.createComponentGroup("Message Log");
@@ -137,15 +160,17 @@ public class ConfigUI extends JPanel implements LogListener {
         logScrollPane.setBorder(BorderFactory.createLineBorder(Color.ORANGE));
         logScrollPane.setBorder(null);
         JPanel logLevelPanel = new JPanel(new GridLayout(1,2));
-        JComboBox logLevelSelector = new JComboBox(new String[]{"INFO", "DEBUG"});
-        this.logLevel = "INFO";
-        logLevelSelector.setSelectedItem(this.logLevel);
+        JComboBox logLevelSelector = new JComboBox(LogManager.LogLevel.values());
+        logLevelSelector.setSelectedItem(logManager.getLogLevel());
         logLevelSelector.addActionListener(e -> {
-            this.logLevel = (String) logLevelSelector.getSelectedItem();
+            logManager.setLogLevel((LogManager.LogLevel) logLevelSelector.getSelectedItem());
+            extension.getPreferences().setSetting(PREF_LOG_LEVEL, logLevelSelector.getSelectedItem());
         });
         logLevelPanel.add(new JLabel("Log Level: "));
         logLevelPanel.add(logLevelSelector);
-        JButton clearButton = panelBuilder.createButton("Clear Logs", actionEvent -> logArea.setText(""));
+        JButton clearButton = panelBuilder.createButton("Clear Logs", actionEvent -> {
+            logArea.setText("");
+        });
 //        clearButton.setMaximumSize(new Dimension(Integer.MAX_VALUE, 20));
 
         GridBagConstraints logPanelGbc = logGroup.generateNextConstraints();
@@ -177,66 +202,20 @@ public class ConfigUI extends JPanel implements LogListener {
         }
     }
 
-    private void startServer(){
+    @Override
+    public void beforeStartup() {
         startStopButton.setText("Starting...");
         startStopButton.setEnabled(false);
+        startStopButton.setSelected(true);
         serverStarting = true;
 
         //Disable all other controls
         enableControls(false);
-
-        try{
-            extension.startCollaboratorProxy();
-
-            //Check the authentication
-            ProxyServiceListener failListener = new ProxyServiceListener() {
-                @Override
-                public void onFail(String reason) {
-                    //Synchronized to stop double error issue.
-                    synchronized (this) {
-                        if(serverStarting) {
-                            onServerStartFailure(reason);
-                            if (extension.getProxyService() != null) {
-                                extension.getProxyService().removeProxyServiceListener(this);
-                                extension.stopCollaboratorProxy();
-                            }
-                        }
-                    }
-                }
-
-                @Override
-                public void onSuccess(String message) {
-                    synchronized (this) {
-                        if(serverStarting) {
-                            onServerStartSuccess();
-                            if (extension.getProxyService() != null) {
-                                extension.getProxyService().removeProxyServiceListener(this);
-                            }
-                        }
-                    }
-                }
-            };
-
-            extension.getProxyService().addProxyServiceListener(failListener);
-
-            //Wait a 500ms for the server to start,
-            //then trigger a polling request to test authentication...
-            new Thread(() -> {
-                try {
-                    callbacks.createBurpCollaboratorClientContext().fetchAllCollaboratorInteractions();
-                }catch (IllegalStateException e){
-                    //Collaborator is disabled?
-                    onServerStartFailure(e.getMessage());
-                }
-            }).start();
-
-        }catch (Exception e){
-            onServerStartFailure(e.getMessage());
-        }
     }
 
-    private void onServerStartFailure(String reason){
-        logController.logInfo("Failed to start the local authentication proxy, " + reason);
+    @Override
+    public void onStartupFail(String message) {
+        logManager.logInfo("Failed to start the local authentication proxy, " + message);
         serverStarting = false;
 
         startStopButton.setText("Start");
@@ -247,15 +226,14 @@ public class ConfigUI extends JPanel implements LogListener {
         enableControls(true);
 
         statusLabel.setText("Status: Not Running");
-
-        if(extension.getProxyService() != null)
-            extension.stopCollaboratorProxy();
     }
 
-    private void onServerStartSuccess(){
+    @Override
+    public void onStartupSuccess(String message) {
         serverStarting = false;
-        logController.logInfo("Local authentication proxy started!");
+        logManager.logInfo("Local authentication proxy started!");
         startStopButton.setText("Stop");
+        startStopButton.setSelected(true);
         statusLabel.setText("Status: Listening on port " + localPortSpinner.getValue());
 
         //Disable all other controls
@@ -264,42 +242,31 @@ public class ConfigUI extends JPanel implements LogListener {
         startStopButton.setEnabled(true);
     }
 
-    private void stopServer(){
-        logController.logInfo("Stopping local authentication proxy...");
-        startStopButton.setText("Stopping...");
-        startStopButton.setEnabled(false);
-        if(extension.getProxyService() != null) {
-            try {
-                extension.stopCollaboratorProxy();
-                if(extension.getProxyService() != null) {
-                    HttpServer proxyserver = extension.getProxyService().getServer();
-                    proxyserver.awaitTermination(10, TimeUnit.SECONDS);
-                }
-                statusLabel.setText("Status: Not Running");
+    @Override
+    public void onShutdown() {
+        logManager.logInfo("Stopping local authentication proxy...");
+        statusLabel.setText("Status: Not Running");
 
-                //Reenable other controls
-                //Disable all other controls
-                enableControls(true);
-
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
-
+        //Reenable other controls
+        //Disable all other controls
+        enableControls(true);
         startStopButton.setEnabled(true);
+        startStopButton.setSelected(false);
         startStopButton.setText("Start");
     }
 
     private void enableControls(boolean enabled){
         localPortSpinner.setEnabled(enabled);
         collaboratorLocationField.setEnabled(enabled);
-        remoteAddressField.setEnabled(enabled);
+        collaboratorPollingField.setEnabled(enabled);
         remotePortSpinner.setEnabled(enabled);
         sslEnabledCheckbox.setEnabled(enabled);
         blockPublicCollaborator.setEnabled(enabled);
         trustSelfSignedCheckbox.setEnabled(enabled);
         hostnameVerificationCheckbox.setEnabled(enabled);
-        secretArea.setEnabled(enabled);
+        proxyRequestsWithBurp.setEnabled(enabled);
+        enableAuthentication.setEnabled(enabled);
+        secretArea.setEnabled(enabled && enableAuthentication.isSelected());
     }
     
     @Override
@@ -314,16 +281,14 @@ public class ConfigUI extends JPanel implements LogListener {
     public void onError(String message) {
         if(logArea == null) return;
         synchronized (logArea) {
-            if (this.logLevel.equalsIgnoreCase("DEBUG"))
-                logArea.append("ERROR: " + message + "\n");
+            logArea.append("ERROR: " + message + "\n");
         }
     }
 
     @Override
     public void onDebug(String message) {
         synchronized (logArea) {
-            if (this.logLevel.equalsIgnoreCase("DEBUG"))
-                logArea.append("DEBUG: " + message + "\n");
+            logArea.append("DEBUG: " + message + "\n");
         }
     }
 }

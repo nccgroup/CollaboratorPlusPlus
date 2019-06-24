@@ -1,7 +1,7 @@
 package burp;
 
-import com.nccgroup.collaboratorauth.extension.CollaboratorAuthenticator;
+import com.nccgroup.collaboratorplusplus.extension.CollaboratorPlusPlus;
 
-public class BurpExtender extends CollaboratorAuthenticator {
+public class BurpExtender extends CollaboratorPlusPlus {
 
 }

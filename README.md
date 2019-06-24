@@ -97,7 +97,7 @@ For both methods, ensure `enable_ssl` is `true` in the config file.
 This method was added purely for compatability reasons. I highly recommend using the simple configuration unless
 there is a reason otherwise.  
 
-1. Edit the config file and set the value for `ssl_private_key_path` to an empty string `""`. 
+1. Edit the config file and set the serializedValue for `ssl_private_key_path` to an empty string `""`. 
     - This will enable the use of the keystore for configuration. 
 1. Generate a new private key and certificate to use for the server using the following command.
     - `openssl req -newkey rsa:2048 -nodes -keyout privatekey.pem -x509 -days 365 -out certificate.pem`

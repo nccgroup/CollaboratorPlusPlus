@@ -1,10 +1,11 @@
-package com.nccgroup.collaboratorauth.extension.ui;
+package com.nccgroup.collaboratorplusplus.extension.ui;
 
+import burp.IBurpExtenderCallbacks;
 import com.coreyd97.BurpExtenderUtilities.Alignment;
 import com.coreyd97.BurpExtenderUtilities.PanelBuilder;
 import com.coreyd97.BurpExtenderUtilities.Preferences;
-import com.nccgroup.collaboratorauth.extension.CollaboratorAuthenticator;
-import com.nccgroup.collaboratorauth.extension.Globals;
+import com.nccgroup.collaboratorplusplus.extension.CollaboratorPlusPlus;
+import com.nccgroup.collaboratorplusplus.extension.Globals;
 
 import javax.swing.*;
 import javax.swing.text.Style;
@@ -25,24 +26,26 @@ import java.net.URL;
 
 public class AboutUI extends JPanel {
 
-    private final CollaboratorAuthenticator collaboratorAuthenticator;
+    private final CollaboratorPlusPlus collaboratorPlusPlus;
     private final Preferences preferences;
     private JComponent panel;
 
-    public AboutUI(CollaboratorAuthenticator collaboratorAuthenticator){
+    public AboutUI(CollaboratorPlusPlus collaboratorPlusPlus){
         this.setLayout(new BorderLayout());
-        this.collaboratorAuthenticator = collaboratorAuthenticator;
-        this.preferences = collaboratorAuthenticator.getPreferences();
+        this.collaboratorPlusPlus = collaboratorPlusPlus;
+        this.preferences = collaboratorPlusPlus.getPreferences();
 
         this.panel = buildMainPanel();
-        this.add(panel, BorderLayout.CENTER);
+        this.add(panel, BorderLayout.NORTH);
+        this.setMinimumSize(panel.getSize());
         this.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
                 if(e.getButton() == MouseEvent.BUTTON2){
-                    AboutUI.this.remove(panel);
+                    AboutUI.this.removeAll();
                     panel = buildMainPanel();
-                    AboutUI.this.add(panel);
+                    AboutUI.this.add(panel, BorderLayout.NORTH);
+                    AboutUI.this.setMinimumSize(panel.getSize());
                     AboutUI.this.revalidate();
                     AboutUI.this.repaint();
                 }
@@ -53,13 +56,13 @@ public class AboutUI extends JPanel {
     private JComponent buildMainPanel(){
         PanelBuilder panelBuilder = new PanelBuilder(preferences);
 
-        JLabel headerLabel = new JLabel("Collaborator Authenticator");
+        JLabel headerLabel = new JLabel("Collaborator++");
         Font font = this.getFont().deriveFont(32f).deriveFont(this.getFont().getStyle() | Font.BOLD);
         headerLabel.setFont(font);
         headerLabel.setHorizontalAlignment(SwingConstants.CENTER);
 
 
-        JLabel subtitle = new JLabel("Client for secure collaborator interaction");
+        JLabel subtitle = new JLabel("Enhanced client for secure collaborator interaction");
         Font subtitleFont = subtitle.getFont().deriveFont(16f).deriveFont(subtitle.getFont().getStyle() | Font.ITALIC);
         subtitle.setFont(subtitleFont);
         subtitle.setHorizontalAlignment(SwingConstants.CENTER);
@@ -200,38 +203,37 @@ public class AboutUI extends JPanel {
             }
         });
 
+
+
         try {
-            String introA = "Collaborator Abuse\n";
-            String introB = "By searching Shodan.io for response headers sent by Burp Collaborator, " +
-                    "NCC Group discovered the existence of 364 private collaborator servers. " +
-                    "160 of these were configured with SSL certificates, many of which with " +
-                    "common name attributes suggesting ownership by leading security companies.\n\n" +
-                    "Since Collaborator does not provide an authentication mechanism, a malicious user may " +
-                    "use any of these discovered servers to exfiltrate stolen data from a compromised network by " +
-                    "simply configuring Burp to use one of the discovered collaborator servers, generating a " +
-                    "collaborator address and making a request from the victim network with the stolen data " +
-                    "contained within a POST request.\n\n" +
-                    "This tool aims to secure Collaborator servers by providing an authenticated proxy for polling " +
-                    "for Collaborator interactions, enabling server owners to limit unauthenticated " +
-                    "polling to the local network.\n\n";
-            String explanationA = "Authentication Mechanism\n";
-            String explanationB = "Collaborator Authenticator consists of two components, the server-side authentication server " +
-                    "which is responsible for validating incoming polling requests before passing them to the " +
-                    "Collaborator server, and the client extension which creates a local HTTP server and " +
-                    "sets itself as the polling address.\n\n" +
-                    "When Burp requests the list of interactions received by the Collaborator server, the extension " +
-                    "encrypts the polling requests with the AES256-CBC encryption scheme, using the shared secret " +
-                    "to generate the encryption key. Provided the shared secret is correct, the authentication " +
-                    "server is able to decrypt the request and forward it to the Collaborator server " +
-                    "to retrieve the interactions for the given Collaborator instance. The response is then " +
-                    "encrypted with the shared-secret before being sent back to the Burp client.\n\n" +
-                    "By using the shared-secret to encrypt the transmission between the Burp client and the authentication server, " +
-                    "the shared-secret does not need to be transmitted along with the request. This allows confidentiality to be " +
-                    "maintained even in cases where HTTP communication must be used between the client and server.";
+            String intro = "When testing for out-of-band vulnerabilities, Collaborator has been an invaluable tool since its initial release in 2015. " +
+                    "However, some issues remain which hinder its effectiveness. While Collaborator contexts created as part of scans " +
+                    "are saved within the Burp project, there is currently no method of polling old contexts such as those created with " +
+                    "extensions such as Collaborator Everywhere or the Collaborator Client. " +
+                    "Additionally, while private Collaborator instances may be deployed, there is currently no " +
+                    "authentication mechanism to restrict usage besides limiting polling to an internal network. \n\n" +
+                    "This extension aims to aleviate those issues.\n\n";
+
+            String instructions = "Instructions\n";
+            String instructionsContent = "To use Collaborator++, simply configure the extension to target your Collaborator server and start the extension.\n" +
+                    "A local server will be started and Burp will be configured to direct all polling requests to it.\n" +
+                    "The extension will then use the options configured to make a request to the polling server on behalf of Burp. " +
+                    "This allows control of various options such as ignoring SSL issues, and allows the extension to capture " +
+                    "the Collaborator context identifiers and associated interactions for future display and manual polling.\n\n";
+            String auth = "Authentication\n";
+            String authInstructions = "In addition to being able to control various configuration aspects of the polling request, " +
+                    "the ability to modify the request also allows the extension to add an authentication mechanism to private collaborator instances.\n\n" +
+                    "This is achieved by using a shared secret known by both the client and server to generate a symmetric encryption key " +
+                    "which is used to encrypt communication between the client and server using AES256. " +
+                    "In addition to authentication, this also enables the usage of HTTP without loss of confidentiality should SSL not be available " +
+                    "for any reason.\n\n" +
+                    "To use authentication, ensure that the server you wish to use is running the Collaborator++ auth server component " +
+                    "and simply configure this extension to target it, making sure to set the port as configured by the server.\n" +
+                    "Details on how to setup the server component can be found on the projects GitHub page.";
 
 
-            String[] sections = new String[]{introA, introB, explanationA, explanationB};
-            Style[] styles = new Style[]{bold, null, bold, null, bold, null, null, italics};
+            String[] sections = new String[]{intro, instructions, instructionsContent, auth, authInstructions};
+            Style[] styles = new Style[]{null, bold, null, bold, null, null, italics};
 
             StyledDocument document = aboutContent.getStyledDocument();
             for (int i = 0; i < sections.length; i++) {
@@ -242,10 +244,12 @@ public class AboutUI extends JPanel {
         } catch (Exception e) {
             StringWriter writer = new StringWriter();
             e.printStackTrace(new PrintWriter(writer));
-            CollaboratorAuthenticator.callbacks.printError(writer.toString());
+            CollaboratorPlusPlus.callbacks.printError(writer.toString());
         }
 
-        aboutContent.setBorder(BorderFactory.createEmptyBorder(0,0,25,0));
+        aboutContent.setBorder(BorderFactory.createEmptyBorder(10,10,10,10));
+        JScrollPane aboutContentScrollPane = new JScrollPane(aboutContent);
+        aboutContentScrollPane.setBorder(BorderFactory.createEmptyBorder(5, 0, 0, 0));
 
         try {
             JPanel panel = panelBuilder.build(new JComponent[][]{
@@ -257,9 +261,8 @@ public class AboutUI extends JPanel {
                     new JComponent[]{creditsPanel, irsdlTwitterButton},
                     new JComponent[]{creditsPanel, nccTwitterButton},
                     new JComponent[]{creditsPanel, viewOnGithubButton},
-                    new JComponent[]{aboutContent, aboutContent},
+                    new JComponent[]{aboutContentScrollPane, aboutContentScrollPane},
                     new JComponent[]{explanationImage, explanationImage},
-                    new JComponent[]{new JPanel(), null},
             }, new int[][]{
                     new int[]{1,1},
                     new int[]{1,1},
@@ -269,10 +272,9 @@ public class AboutUI extends JPanel {
                     new int[]{1,1},
                     new int[]{1,1},
                     new int[]{1,1},
-                    new int[]{1,1},
-                    new int[]{1,1},
-                    new int[]{100,100},
-            }, Alignment.TOPMIDDLE, 0.25, 1D);
+                    new int[]{200,200},
+                    new int[]{0,0},
+            }, Alignment.TOPMIDDLE, 0.5, 1D);
             return panel;
         } catch (Exception e) {
             return new JLabel("Failed to build credits panel :(");

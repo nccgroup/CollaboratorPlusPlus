@@ -40,7 +40,7 @@ tasks.withType(Jar){
 jar{
     manifest {
         attributes(
-                "Main-Class": "com.nccgroup.collaboratorauth.server.CollaboratorServer"
+                "Main-Class": "com.nccgroup.collaboratorplusplus.server.CollaboratorServer"
         )
     }
     from {

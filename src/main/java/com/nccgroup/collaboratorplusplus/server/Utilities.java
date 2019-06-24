@@ -1,4 +1,4 @@
-package com.nccgroup.collaboratorauth.server;
+package com.nccgroup.collaboratorplusplus.server;
 
 import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemReader;

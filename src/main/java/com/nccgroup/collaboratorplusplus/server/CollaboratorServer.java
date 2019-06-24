@@ -1,5 +1,7 @@
-package com.nccgroup.collaboratorauth.server;
+package com.nccgroup.collaboratorplusplus.server;
 
+import com.nccgroup.collaboratorplusplus.extension.LogListener;
+import com.nccgroup.collaboratorplusplus.utilities.LogManager;
 import nu.studer.java.util.OrderedProperties;
 import org.apache.http.impl.NoConnectionReuseStrategy;
 import org.apache.http.impl.bootstrap.HttpServer;
@@ -7,6 +9,7 @@ import org.apache.http.impl.bootstrap.ServerBootstrap;
 import org.apache.http.ssl.SSLContexts;
 
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -18,9 +21,11 @@ import java.security.cert.Certificate;
 import java.util.ArrayList;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
+import com.nccgroup.collaboratorplusplus.utilities.LogManager.LogLevel;
 
 public class CollaboratorServer {
 
+    public static LogManager logManager;
     private static final String DEFAULT_KEYSTORE_PASSWORD = "changeit";
     private static final String COLLABORATOR_SERVER_ADDRESS = "collaborator_server_address";
     private static final String COLLABORATOR_SERVER_PORT = "collaborator_server_port";
@@ -40,9 +45,11 @@ public class CollaboratorServer {
 
     private HttpServer server;
     private Integer listenPort;
-    private String logLevel;
 
     private CollaboratorServer(Properties properties) throws Exception {
+        LogLevel logLevel = LogLevel.valueOf(properties.getProperty(LOG_LEVEL));
+        logManager.setLogLevel(logLevel);
+
         String actualAddress = properties.getProperty(COLLABORATOR_SERVER_ADDRESS);
         Integer actualPort = Integer.parseInt(properties.getProperty(COLLABORATOR_SERVER_PORT));
         boolean actualIsHttps = Boolean.parseBoolean(properties.getProperty(COLLABORATOR_SERVER_ISHTTPS));
@@ -50,7 +57,6 @@ public class CollaboratorServer {
         listenPort = Integer.parseInt(properties.getProperty(LISTEN_PORT));
         InetAddress listenAddress = InetAddress.getByName(properties.getProperty(LISTEN_ADDRESS));
         boolean enableSSL = Boolean.parseBoolean(properties.getProperty(ENABLE_SSL));
-        logLevel = properties.getProperty(LOG_LEVEL);
 
         String secret = properties.getProperty(SECRET).trim();
 
@@ -58,7 +64,14 @@ public class CollaboratorServer {
                 .setConnectionReuseStrategy(new NoConnectionReuseStrategy())
                 .setListenerPort(listenPort)
                 .setLocalAddress(listenAddress)
-                .registerHandler("*", new HttpHandler(actualAddress, actualPort, actualIsHttps, secret, logLevel));
+                .setExceptionLogger(ex -> {
+                    if(ex instanceof SSLException){
+                        logManager.logError("Client Connection Failed: " + ex.getMessage());
+                    }else{
+                        logManager.logError(ex);
+                    }
+                })
+                .registerHandler("*", new HttpHandler(actualAddress, actualPort, actualIsHttps, secret));
 
         if(enableSSL){
             System.out.println("Starting server in HTTPS mode. Creating SSL context.");
@@ -98,7 +111,7 @@ public class CollaboratorServer {
             System.out.println("Starting server in HTTP mode.");
         }
 
-        if(logLevel.equalsIgnoreCase("debug") || logLevel.equalsIgnoreCase("error")) {
+        if(logLevel.ordinal() >= LogLevel.ERROR.ordinal()) {
             System.out.println("Shared Secret: " + secret);
             serverBootstrap.setExceptionLogger(ex -> {
                 System.out.println(ex.getMessage());
@@ -130,6 +143,23 @@ public class CollaboratorServer {
     }
 
     public static void main(String[] args) throws Exception {
+        logManager = new LogManager();
+        logManager.addLogListener(new LogListener() {
+            @Override
+            public void onInfo(String message) {
+                System.out.println("INFO: " + message);
+            }
+
+            @Override
+            public void onError(String message) {
+                System.err.println("ERROR: " + message);
+            }
+
+            @Override
+            public void onDebug(String message) {
+                System.out.println("DEBUG: " + message);
+            }
+        });
 
         OrderedProperties properties = getDefaultProperties();
         if(args.length == 0){
@@ -177,7 +207,7 @@ public class CollaboratorServer {
                 .withSuppressDateInComment(true).build();
         defaultProperties.setProperty(COLLABORATOR_SERVER_ADDRESS, "127.0.0.1");
         defaultProperties.setProperty(COLLABORATOR_SERVER_PORT, "80");
-        defaultProperties.setProperty(LISTEN_PORT, "5050");
+        defaultProperties.setProperty(LISTEN_PORT, "5443");
         defaultProperties.setProperty(LISTEN_ADDRESS, "0.0.0.0");
         defaultProperties.setProperty(ENABLE_SSL, "false");
         defaultProperties.setProperty(PRIVATE_KEY_PATH, "/certs/key.pem.pkcs8");

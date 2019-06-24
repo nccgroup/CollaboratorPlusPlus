@@ -1,15 +1,44 @@
-package com.nccgroup.collaboratorauth.extension;
+package com.nccgroup.collaboratorplusplus.extension;
 
+import burp.IBurpExtenderCallbacks;
+import com.coreyd97.BurpExtenderUtilities.Preferences;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import org.apache.http.HttpHost;
 
-import static com.nccgroup.collaboratorauth.extension.CollaboratorAuthenticator.logController;
-import static com.nccgroup.collaboratorauth.extension.CollaboratorAuthenticator.callbacks;
-import static com.nccgroup.collaboratorauth.extension.Globals.*;
+import java.net.Inet4Address;
+
+import static com.nccgroup.collaboratorplusplus.extension.CollaboratorPlusPlus.logManager;
+import static com.nccgroup.collaboratorplusplus.extension.CollaboratorPlusPlus.callbacks;
+import static com.nccgroup.collaboratorplusplus.extension.Globals.*;
 
 public class Utilities {
+
+    public static HttpHost getBurpProxyHost(String scheme) {
+        String configString = callbacks.saveConfigAsJson("proxy.request_listeners");
+        JsonObject config = new JsonParser().parse(configString).getAsJsonObject();
+        JsonArray listeners = config.getAsJsonObject("proxy").getAsJsonArray("request_listeners");
+        for (JsonElement listener : listeners) {
+            JsonObject listnerObject = (JsonObject) listener;
+            if(listnerObject.get("running").getAsBoolean()){
+                int port = listnerObject.get("listener_port").getAsInt();
+                String listenMode = listnerObject.get("listen_mode").getAsString();
+                if(listenMode.equals("loopback_only")){
+                    return new HttpHost("127.0.0.1", port, scheme);
+                }
+                if(listenMode.equals("all_interfaces")){
+                    return new HttpHost("0.0.0.0", port, scheme);
+                }
+                if(listenMode.equals("specific_address")){
+                    String address = listnerObject.get("listen_specific_address").getAsString();
+                    return new HttpHost(address, port, scheme);
+                }
+            }
+        }
+        return null;
+    }
 
     public static void blockPublicCollaborator(){
         String stringConfig = callbacks.saveConfigAsJson(HOSTNAME_RESOLUTION_CONFIG_PATH);
@@ -29,22 +58,22 @@ public class Utilities {
                     if(ip.equalsIgnoreCase("127.0.0.1")){
                         //Existing entry, just make sure its enabled.
                         if(enabled){
-                            logController.logInfo("Sink for public collaborator server already exists, continuing...");
+                            logManager.logInfo("Sink for public collaborator server already exists, continuing...");
                         }else {
-                            logController.logInfo("Enabling sink for public collaborator server.");
+                            logManager.logInfo("Enabling sink for public collaborator server.");
                             resolutionElement.getAsJsonObject().addProperty("enabled", true);
                         }
                         shouldAddEntry = false;
                     }else{
                         //Not our entry,
-                        logController.logInfo("Hostname resolution entry exists for public collaborator server. Disabling and adding sink entry.");
+                        logManager.logInfo("Hostname resolution entry exists for public collaborator server. Disabling and adding sink entry.");
                         resolutionElement.getAsJsonObject().addProperty("enabled", false);
                     }
                     break;
                 }
             }
         }else{
-            logController.logInfo("Adding DNS sink for the public collaborator server: \"burpcollaborator.net\" .");
+            logManager.logInfo("Adding DNS sink for the public collaborator server: \"burpcollaborator.net\" .");
         }
         if(shouldAddEntry){
             resolutionElements.add(buildPublicCollaboratorSink());
@@ -65,7 +94,7 @@ public class Utilities {
             Boolean enabled = resolutionElement.getAsJsonObject().get("enabled").getAsBoolean();
             if(hostname.equalsIgnoreCase(PUBLIC_COLLABORATOR_HOSTNAME) && ip.equalsIgnoreCase("127.0.0.1")){
                 resolutionElement.getAsJsonObject().addProperty("enabled", false);
-                logController.logInfo("Disabled sink for public collaborator server.");
+                logManager.logInfo("Disabled sink for public collaborator server.");
                 break;
             }
         }
@@ -79,5 +108,24 @@ public class Utilities {
         entry.addProperty("hostname", PUBLIC_COLLABORATOR_HOSTNAME);
         entry.addProperty("ip_address", "127.0.0.1");
         return entry;
+    }
+
+    public static void backupCollaboratorConfig(Preferences preferences){
+        String config = callbacks.saveConfigAsJson(COLLABORATOR_SERVER_CONFIG_PATH);
+        preferences.setSetting(PREF_ORIGINAL_COLLABORATOR_SETTINGS, config);
+    }
+
+    public static void restoreCollaboratorConfig(Preferences preferences){
+        String config = preferences.getSetting(PREF_ORIGINAL_COLLABORATOR_SETTINGS);
+        callbacks.loadConfigFromJson(config);
+    }
+
+    public static String buildPollingRedirectionConfig(Preferences preferences, int listenPort){
+        return "{\"project_options\": {\"misc\": {\"collaborator_server\": " +
+                "{\"location\": \"" + preferences.getSetting(PREF_COLLABORATOR_ADDRESS) + "\"," +
+                "\"polling_location\": \"" + Inet4Address.getLoopbackAddress().getHostName() + ":" + listenPort + "\"," +
+                "\"poll_over_unencrypted_http\": \"true\"," +
+                "\"type\": \"private\"" +
+                "}}}}";
     }
 }

@@ -1,9 +1,9 @@
-rootProject.name = 'CollaboratorAuth'
+rootProject.name = 'Collaborator++'
 
-//if(file('../BurpExtenderUtilities').exists()) {
-//    includeBuild('../BurpExtenderUtilities') {
-//        dependencySubstitution {
-//            substitute module('com.github.CoreyD97:BurpExtenderUtilities') with project(':')
-//        }
-//    }
-//}
+if(file('../BurpExtenderUtilities').exists()) {
+    includeBuild('../BurpExtenderUtilities') {
+        dependencySubstitution {
+            substitute module('com.github.CoreyD97:BurpExtenderUtilities') with project(':')
+        }
+    }
+}

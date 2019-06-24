@@ -1,4 +1,4 @@
-package com.nccgroup.collaboratorauth.extension;
+package com.nccgroup.collaboratorplusplus.extension;
 
 public interface LogListener {
     void onInfo(String message);

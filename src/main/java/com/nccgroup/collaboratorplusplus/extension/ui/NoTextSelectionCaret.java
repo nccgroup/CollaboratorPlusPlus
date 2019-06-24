@@ -1,4 +1,4 @@
-package com.nccgroup.collaboratorauth.extension.ui;
+package com.nccgroup.collaboratorplusplus.extension.ui;
 
 import javax.swing.text.DefaultCaret;
 import javax.swing.text.JTextComponent;
