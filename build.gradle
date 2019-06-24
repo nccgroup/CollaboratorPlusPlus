@@ -23,7 +23,7 @@ configurations {
 }
 
 dependencies {
-    compile 'com.github.CoreyD97:BurpExtenderUtilities:890266f248916ad535a1d1d1813d1d7999b75706'
+    compile 'com.github.CoreyD97:BurpExtenderUtilities:a5714cdf074e3cb2b6d13f2397b359eeb740ddc4'
     compile 'net.portswigger.burp.extender:burp-extender-api:1.7.22'
     compile 'com.google.code.gson:gson:+'
     compile group: 'org.apache.httpcomponents', name: 'httpclient', version: '4.5.6'
