@@ -118,7 +118,7 @@ public class ConfigUI extends JPanel implements LogListener, ProxyServiceListene
         controlGroup.addPreferenceComponent(PREF_AUTO_START, "Start Automatically on Load");
         startStopButton = controlGroup.addToggleButton("Start", actionEvent -> {
             JToggleButton thisButton = (JToggleButton) actionEvent.getSource();
-            SwingUtilities.invokeLater(() -> {
+            new Thread(() -> {
                 if(thisButton.isSelected()){
                     try {
                         this.extension.startCollaboratorProxy();
@@ -128,7 +128,7 @@ public class ConfigUI extends JPanel implements LogListener, ProxyServiceListene
                 }else{
                     this.extension.stopCollaboratorProxy();
                 }
-            });
+            }).start();
         });
 
         ComponentGroup secretGroup = panelBuilder.createComponentGroup("Collaborator Authentication");

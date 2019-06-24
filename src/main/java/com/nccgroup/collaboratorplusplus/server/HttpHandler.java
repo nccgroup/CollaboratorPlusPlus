@@ -2,7 +2,10 @@ package com.nccgroup.collaboratorplusplus.server;
 
 import com.nccgroup.collaboratorplusplus.utilities.Encryption;
 import org.apache.commons.io.IOUtils;
-import org.apache.http.*;
+import org.apache.http.Header;
+import org.apache.http.HttpRequest;
+import org.apache.http.HttpResponse;
+import org.apache.http.HttpStatus;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.ContentType;
@@ -13,7 +16,6 @@ import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicHttpEntityEnclosingRequest;
 import org.apache.http.protocol.HttpContext;
 import org.apache.http.protocol.HttpRequestHandler;
-import org.bouncycastle.crypto.InvalidCipherTextException;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
@@ -21,9 +23,9 @@ import javax.crypto.NoSuchPaddingException;
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.net.URL;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.InvalidParameterSpecException;
 import java.util.Base64;
@@ -99,8 +101,7 @@ public class HttpHandler implements HttpRequestHandler {
                 } else {
                     throw new Exception("The Collaborator server responded with a status code: " + actualStatus);
                 }
-            } catch (NoSuchAlgorithmException | InvalidKeySpecException
-                    | InvalidCipherTextException | NoSuchProviderException e) {
+            } catch (InvalidKeyException | InvalidAlgorithmParameterException | IllegalBlockSizeException | BadPaddingException | NoSuchPaddingException e) {
                 //Could not decrypt the request. The client probably used an invalid secret.
                 CollaboratorServer.logManager.logError(e);
                 response.setStatusCode(HttpStatus.SC_UNAUTHORIZED);
@@ -111,7 +112,7 @@ public class HttpHandler implements HttpRequestHandler {
                 response.setEntity(createEncryptedResponse(e.getMessage()));
             }
         } catch (Exception e) {
-            //Log exception?
+//            Log exception?
             response.setStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR);
         }
 

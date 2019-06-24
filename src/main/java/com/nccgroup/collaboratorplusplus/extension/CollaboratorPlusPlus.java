@@ -85,7 +85,7 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
             if(this.preferences.getSetting(PREF_AUTO_START)){
                 new Thread(() -> {
                     try {
-                        Thread.currentThread().sleep(500);
+                        Thread.sleep(500);
                         startCollaboratorProxy();
                     } catch (Exception ignored) {}
                 }).start();
@@ -97,8 +97,16 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
         }
     }
 
-    public synchronized void startCollaboratorProxy() throws IOException, URISyntaxException {
+    public void startCollaboratorProxy() throws IOException, URISyntaxException {
         if(proxyService != null) throw new IllegalStateException("The proxy service is already running.");
+
+        for (ProxyServiceListener listener : proxyServiceListeners) {
+            try {
+                listener.beforeStartup();
+            }catch (Exception ignored){
+                ignored.printStackTrace();
+            }
+        }
 
         if(preferences.getSetting(PREF_POLLING_ADDRESS).equals("")){
             logManager.logInfo("Polling location was not configured. Defaulting to the Collaborator address.");
@@ -124,34 +132,32 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
         proxyService = new ProxyService(collaboratorContextManager, listenPort, pollingAddress,
                 useAuthentication, secret, ignoreCertificateErrors, verifyHostname, proxy);
 
-        synchronized (proxyService) {
-            //Must set this before attempting to start the server to catch errors when starting the server
-            proxyService.setTestCallback((success, response) -> {
-                if (success) {
-                    for (ProxyServiceListener proxyServiceListener : proxyServiceListeners) {
-                        proxyServiceListener.onStartupSuccess(response);
-                    }
-                } else {
-                    for (ProxyServiceListener proxyServiceListener : proxyServiceListeners) {
-                        proxyServiceListener.onStartupFail(response);
-                    }
-                    stopCollaboratorProxy();
+        //Must set this before attempting to start the server to catch errors when starting the server
+        proxyService.setTestCallback((success, response) -> {
+            if (success) {
+                for (ProxyServiceListener proxyServiceListener : proxyServiceListeners) {
+                    proxyServiceListener.onStartupSuccess(response);
                 }
-            });
-
-            Utilities.backupCollaboratorConfig(preferences);
-            callbacks.loadConfigFromJson(Utilities.buildPollingRedirectionConfig(preferences, listenPort));
-
-            proxyService.start();
-            if(proxyService != null) {
-                //If the proxy service threw an exception when starting, it will have been cleaned up already.
-                proxyService.testConnection();
-                proxyService.setTestCallback(null);
+            } else {
+                for (ProxyServiceListener proxyServiceListener : proxyServiceListeners) {
+                    proxyServiceListener.onStartupFail(response);
+                }
+                stopCollaboratorProxy();
             }
+        });
+
+        Utilities.backupCollaboratorConfig(preferences);
+        callbacks.loadConfigFromJson(Utilities.buildPollingRedirectionConfig(preferences, listenPort));
+
+        proxyService.start();
+        if(proxyService != null) {
+            //If the proxy service threw an exception when starting, it will have been cleaned up already.
+            proxyService.testConnection();
+            proxyService.setTestCallback(null);
         }
     }
 
-    public synchronized void stopCollaboratorProxy(){
+    public void stopCollaboratorProxy(){
         if(proxyService == null) throw new IllegalStateException("The proxy service is not running.");
         proxyService.stop();
         proxyService = null;
