@@ -1,4 +1,4 @@
-rootProject.name = 'Collaborator++'
+rootProject.name = 'CollaboratorPlusPlus'
 
 if(file('../BurpExtenderUtilities').exists()) {
     includeBuild('../BurpExtenderUtilities') {
