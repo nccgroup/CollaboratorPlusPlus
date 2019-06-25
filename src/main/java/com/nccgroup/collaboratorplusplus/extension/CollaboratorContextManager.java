@@ -24,7 +24,8 @@ public class CollaboratorContextManager {
     }
 
     public void pollingRequestSent(String identifier){
-        if(!this.collaboratorHistory.containsKey(identifier)){
+        boolean isFirstPoll = !this.collaboratorHistory.containsKey(identifier);
+        if(isFirstPoll){
             this.collaboratorHistory.put(identifier, new ContextInfo(identifier));
             this.identifiers.add(identifier);
         }else{
@@ -33,8 +34,10 @@ public class CollaboratorContextManager {
 
         for (CollaboratorEventListener eventListener : eventListeners) {
             try {
-                eventListener.onPollingRequestSent(identifier);
-            }catch (Exception ignored){}
+                eventListener.onPollingRequestSent(identifier, isFirstPoll);
+            }catch (Exception ignored){
+                ignored.printStackTrace();
+            }
         }
     }
 
@@ -51,6 +54,7 @@ public class CollaboratorContextManager {
             try {
                 eventListener.onPollingResponseRecieved(identifier, interactions);
             }catch (Exception ignored){
+                ignored.printStackTrace();
             }
         }
     }
@@ -64,6 +68,8 @@ public class CollaboratorContextManager {
             JsonObject responseJson = new JsonParser().parse(responseString).getAsJsonObject();
             if(responseJson.has("responses"))
                 return responseJson.getAsJsonArray( "responses");
+            else
+                return new JsonArray();
         }
         return null;
     }

@@ -30,6 +30,7 @@ class ContextInformationPanel extends JSplitPane implements CollaboratorEventLis
     ContextInformationPanel(CollaboratorContextManager contextManager, Preferences preferences){
         super(VERTICAL_SPLIT);
         this.contextManager = contextManager;
+        this.contextManager.addEventListener(this);
         this.preferences = preferences;
         this.interactionsTable = new InteractionsTable(contextManager);
         this.interactionsTable.getSelectionModel().addListSelectionListener(new ListSelectionListener() {
@@ -110,15 +111,15 @@ class ContextInformationPanel extends JSplitPane implements CollaboratorEventLis
     }
 
     @Override
-    public void onPollingRequestSent(String biid) {
-        if(biid.equalsIgnoreCase(selectedContext.getIdentifier())){
+    public void onPollingRequestSent(String biid, boolean isFirstPoll) {
+        if(selectedContext != null && biid.equalsIgnoreCase(selectedContext.getIdentifier())){
             displayContext(contextManager.getInteractions(biid));
         }
     }
 
     @Override
     public void onPollingResponseRecieved(String biid, JsonArray interactions) {
-        if(biid.equalsIgnoreCase(selectedContext.getIdentifier())){
+        if(selectedContext != null && biid.equalsIgnoreCase(selectedContext.getIdentifier())){
             displayContext(contextManager.getInteractions(biid));
         }
     }

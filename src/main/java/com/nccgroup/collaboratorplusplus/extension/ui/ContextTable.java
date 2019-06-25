@@ -28,15 +28,33 @@ class ContextTable extends JTable implements CollaboratorEventListener {
     }
 
     @Override
-    public void onPollingRequestSent(String biid) {
+    public void onPollingRequestSent(String biid, boolean isFirstPoll) {
         int rowIndex = contextManager.getIdentifiers().indexOf(biid);
-        ((AbstractTableModel) this.getModel()).fireTableRowsUpdated(rowIndex, rowIndex);
+        try {
+            if (isFirstPoll) {
+                ((AbstractTableModel) this.getModel()).fireTableRowsInserted(rowIndex, rowIndex);
+            } else {
+                ((AbstractTableModel) this.getModel()).fireTableCellUpdated(rowIndex, 1);
+                ((AbstractTableModel) this.getModel()).fireTableCellUpdated(rowIndex, 2);
+            }
+        }catch (Exception e){
+            //TODO Fix before release.
+            e.printStackTrace();
+            ((AbstractTableModel) this.getModel()).fireTableDataChanged();
+        }
     }
 
     @Override
     public void onPollingResponseRecieved(String biid, JsonArray interactions) {
         int rowIndex = contextManager.getIdentifiers().indexOf(biid);
-        ((AbstractTableModel) this.getModel()).fireTableRowsUpdated(rowIndex, rowIndex);
+        try {
+            ((AbstractTableModel) this.getModel()).fireTableCellUpdated(rowIndex, 1);
+            ((AbstractTableModel) this.getModel()).fireTableCellUpdated(rowIndex, 2);
+        }catch (Exception e){
+            //TODO Fix before release
+            e.printStackTrace();
+            ((AbstractTableModel) this.getModel()).fireTableDataChanged();
+        }
     }
 
     private class ContextTableTableModel extends AbstractTableModel {

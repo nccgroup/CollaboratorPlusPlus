@@ -33,7 +33,7 @@ public class InteractionsTable extends JTable implements CollaboratorEventListen
     }
 
     @Override
-    public void onPollingRequestSent(String biid) {}
+    public void onPollingRequestSent(String biid, boolean isFirstPoll) {}
 
     @Override
     public void onPollingResponseRecieved(String biid, JsonArray interactions) {
