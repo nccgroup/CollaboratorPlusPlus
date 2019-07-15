@@ -5,3 +5,4 @@ out/
 keys/
 *.burp
 CollaboratorServer.properties
+releases/
