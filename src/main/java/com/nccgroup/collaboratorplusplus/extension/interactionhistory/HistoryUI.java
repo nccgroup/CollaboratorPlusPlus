@@ -1,9 +1,10 @@
-package com.nccgroup.collaboratorplusplus.extension.ui;
+package com.nccgroup.collaboratorplusplus.extension.interactionhistory;
 
 import com.coreyd97.BurpExtenderUtilities.Preferences;
-import com.nccgroup.collaboratorplusplus.extension.CollaboratorContextManager;
+import com.nccgroup.collaboratorplusplus.extension.context.CollaboratorContextManager;
 
 import javax.swing.*;
+import java.awt.*;
 
 public class HistoryUI extends JSplitPane {
 
@@ -13,7 +14,7 @@ public class HistoryUI extends JSplitPane {
     private ContextInformationPanel contextInformationPanel;
 
     public HistoryUI(CollaboratorContextManager contextManager, Preferences preferences){
-        super(HORIZONTAL_SPLIT);
+        super(VERTICAL_SPLIT);
         this.contextManager = contextManager;
         this.preferences = preferences;
         buildMainPanel();
@@ -21,24 +22,22 @@ public class HistoryUI extends JSplitPane {
 
     private void buildMainPanel(){
         contextTable = new ContextTable(contextManager);
-        JScrollPane interactionScrollPane = new JScrollPane(contextTable);
+        JScrollPane contextScrollPane = new JScrollPane(contextTable);
+        contextScrollPane.setMinimumSize(new Dimension(0, 75));
         contextInformationPanel = new ContextInformationPanel(contextManager, preferences);
 
         contextTable.getSelectionModel().addListSelectionListener(e -> {
             int selectedRow = contextTable.getSelectedRow();
             if(selectedRow == -1) {
-                contextInformationPanel.displayContext(null);
+                SwingUtilities.invokeLater(() -> contextInformationPanel.displayContext(null));
             }else{
                 String id = (String) contextTable.getValueAt(selectedRow, 0);
-                contextInformationPanel.displayContext(contextManager.getInteractions(id));
+                SwingUtilities.invokeLater(() ->
+                        contextInformationPanel.displayContext(contextManager.getCollaboratorContext(id)));
             }
         });
 
-        this.setLeftComponent(interactionScrollPane);
-        this.setRightComponent(contextInformationPanel);
-
-        SwingUtilities.invokeLater(() -> {
-            this.setDividerLocation(0.4);
-        });
+        this.setTopComponent(contextScrollPane);
+        this.setBottomComponent(contextInformationPanel);
     }
 }

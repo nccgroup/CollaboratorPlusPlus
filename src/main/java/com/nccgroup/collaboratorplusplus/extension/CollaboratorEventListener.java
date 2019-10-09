@@ -1,8 +1,11 @@
 package com.nccgroup.collaboratorplusplus.extension;
 
-import com.google.gson.JsonArray;
+import com.nccgroup.collaboratorplusplus.extension.context.Interaction;
+
+import java.util.ArrayList;
 
 public interface CollaboratorEventListener {
     void onPollingRequestSent(String biid, boolean isFirstPoll);
-    void onPollingResponseRecieved(String biid, JsonArray interactions);
+    void onPollingResponseReceived(String biid, ArrayList<Interaction> interactions);
+    void onPollingFailure(String error);
 }

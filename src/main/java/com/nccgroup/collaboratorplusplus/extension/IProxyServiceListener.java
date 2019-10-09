@@ -1,8 +1,8 @@
 package com.nccgroup.collaboratorplusplus.extension;
 
-public interface ProxyServiceListener {
+public interface IProxyServiceListener {
     void beforeStartup();
-    void onStartupFail(String message);
     void onStartupSuccess(String message);
+    void onStartupFail(String message);
     void onShutdown();
 }

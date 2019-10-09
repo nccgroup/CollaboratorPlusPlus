@@ -1,11 +1,12 @@
 package com.nccgroup.collaboratorplusplus.extension.ui;
 
-import burp.IBurpExtenderCallbacks;
 import com.coreyd97.BurpExtenderUtilities.Alignment;
 import com.coreyd97.BurpExtenderUtilities.PanelBuilder;
 import com.coreyd97.BurpExtenderUtilities.Preferences;
 import com.nccgroup.collaboratorplusplus.extension.CollaboratorPlusPlus;
 import com.nccgroup.collaboratorplusplus.extension.Globals;
+import com.nccgroup.collaboratorplusplus.utilities.NoTextSelectionCaret;
+import com.nccgroup.collaboratorplusplus.utilities.WrappedTextPane;
 
 import javax.swing.*;
 import javax.swing.text.Style;
@@ -251,6 +252,7 @@ public class AboutUI extends JPanel {
         JScrollPane aboutContentScrollPane = new JScrollPane(aboutContent);
         aboutContentScrollPane.setBorder(BorderFactory.createEmptyBorder(5, 0, 0, 0));
 
+        JPanel paddingPanel = new JPanel();
         try {
             JPanel panel = panelBuilder.build(new JComponent[][]{
                     new JComponent[]{headerLabel, headerLabel},
@@ -263,6 +265,7 @@ public class AboutUI extends JPanel {
                     new JComponent[]{creditsPanel, viewOnGithubButton},
                     new JComponent[]{aboutContentScrollPane, aboutContentScrollPane},
                     new JComponent[]{explanationImage, explanationImage},
+//                    new JComponent[]{paddingPanel, paddingPanel}
             }, new int[][]{
                     new int[]{1,1},
                     new int[]{1,1},
@@ -274,7 +277,8 @@ public class AboutUI extends JPanel {
                     new int[]{1,1},
                     new int[]{200,200},
                     new int[]{0,0},
-            }, Alignment.TOPMIDDLE, 0.5, 1D);
+//                    new int[]{0,0},
+            }, Alignment.TOPMIDDLE, 0.5, 0.9);
             return panel;
         } catch (Exception e) {
             return new JLabel("Failed to build credits panel :(");

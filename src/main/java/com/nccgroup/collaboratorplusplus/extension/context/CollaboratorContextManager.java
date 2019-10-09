@@ -1,13 +1,19 @@
-package com.nccgroup.collaboratorplusplus.extension;
+package com.nccgroup.collaboratorplusplus.extension.context;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.nccgroup.collaboratorplusplus.extension.CollaboratorEventListener;
+import com.nccgroup.collaboratorplusplus.extension.CollaboratorPlusPlus;
+import com.nccgroup.collaboratorplusplus.extension.Globals;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
 import org.apache.http.util.EntityUtils;
 
-import java.util.*;
+import java.awt.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
 
 public class CollaboratorContextManager {
 
@@ -23,14 +29,16 @@ public class CollaboratorContextManager {
         loadCollaboratorContextHistory();
     }
 
-    public void pollingRequestSent(String identifier){
+    public void pollingRequestSent(String collaboratorAddress, String identifier){
         boolean isFirstPoll = !this.collaboratorHistory.containsKey(identifier);
         if(isFirstPoll){
-            this.collaboratorHistory.put(identifier, new ContextInfo(identifier));
+            this.collaboratorHistory.put(identifier, new ContextInfo(collaboratorAddress, identifier));
             this.identifiers.add(identifier);
         }else{
             this.collaboratorHistory.get(identifier).lastPolled = new Date();
         }
+
+        saveState();
 
         for (CollaboratorEventListener eventListener : eventListeners) {
             try {
@@ -41,18 +49,22 @@ public class CollaboratorContextManager {
         }
     }
 
-    public void interactionEventsReceived(String identifier, JsonArray interactions){
+    public void interactionEventsReceived(String collaboratorAddress, String identifier, JsonArray interactionArray){
         if(!this.collaboratorHistory.containsKey(identifier)){
-            this.collaboratorHistory.put(identifier, new ContextInfo(identifier));
+            this.collaboratorHistory.put(identifier, new ContextInfo(collaboratorAddress, identifier));
             this.identifiers.add(identifier);
         }
 
-        this.collaboratorHistory.get(identifier).interactionEvents.addAll(interactions);
-        this.extension.getPreferences().setSetting(Globals.PREF_COLLABORATOR_HISTORY, collaboratorHistory);
+        //Parse our interactions
+        ContextInfo contextInfo = this.collaboratorHistory.get(identifier);
+        ArrayList<Interaction> interactions = ContextInfo.parseInteractions(contextInfo, interactionArray);
+        contextInfo.addInteractions(interactions);
+
+        saveState();
 
         for (CollaboratorEventListener eventListener : eventListeners) {
             try {
-                eventListener.onPollingResponseRecieved(identifier, interactions);
+                eventListener.onPollingResponseReceived(identifier, interactions);
             }catch (Exception ignored){
                 ignored.printStackTrace();
             }
@@ -74,11 +86,15 @@ public class CollaboratorContextManager {
         return null;
     }
 
-    public HashMap<String, ContextInfo> getCollaboratorHistory(){
+    public void saveState(){
+        this.extension.getPreferences().setSetting(Globals.PREF_COLLABORATOR_HISTORY, collaboratorHistory);
+    }
+
+    public HashMap<String, ContextInfo> getCollaboratorContexts(){
         return this.collaboratorHistory;
     }
 
-    public ContextInfo getInteractions(String identifier){
+    public ContextInfo getCollaboratorContext(String identifier){
         return this.collaboratorHistory.get(identifier);
     }
 
@@ -99,28 +115,15 @@ public class CollaboratorContextManager {
         this.identifiers.addAll(this.collaboratorHistory.keySet());
     }
 
-    public static class ContextInfo {
-        String identifier;
-        Date lastPolled;
-        JsonArray interactionEvents;
+    public void deleteContext(ContextInfo contextInfo) {
+        this.identifiers.remove(contextInfo.getIdentifier());
+        this.collaboratorHistory.remove(contextInfo.getIdentifier());
+        saveState();
+    }
 
-        private ContextInfo(String identifier){
-            this.identifier = identifier;
-            this.lastPolled = new Date();
-            interactionEvents = new JsonArray();
-        }
-
-        public String getIdentifier() {
-            return identifier;
-        }
-
-        public Date getLastPolled() {
-            return lastPolled;
-        }
-
-        public JsonArray getInteractionEvents() {
-            return interactionEvents;
-        }
+    public void setHighlight(ContextInfo contextInfo, Color color){
+        contextInfo.highlight = color;
+        saveState();
     }
 
 }

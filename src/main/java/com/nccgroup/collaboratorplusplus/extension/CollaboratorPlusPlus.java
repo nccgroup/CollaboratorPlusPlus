@@ -5,13 +5,17 @@ import burp.IBurpExtenderCallbacks;
 import burp.IExtensionStateListener;
 import com.coreyd97.BurpExtenderUtilities.DefaultGsonProvider;
 import com.coreyd97.BurpExtenderUtilities.Preferences;
+import com.coreyd97.BurpExtenderUtilities.StdOutLogger;
 import com.google.gson.reflect.TypeToken;
+import com.nccgroup.collaboratorplusplus.extension.context.CollaboratorContextManager;
+import com.nccgroup.collaboratorplusplus.extension.context.ContextInfo;
+import com.nccgroup.collaboratorplusplus.extension.context.Interaction;
+import com.nccgroup.collaboratorplusplus.extension.context.InteractionSerializer;
 import com.nccgroup.collaboratorplusplus.extension.ui.ExtensionUI;
 import com.nccgroup.collaboratorplusplus.utilities.LogManager;
 import org.apache.http.HttpHost;
 
 import javax.swing.*;
-import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -27,7 +31,7 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
     private ProxyService proxyService;
     private CollaboratorContextManager collaboratorContextManager;
     private Preferences preferences;
-    private ArrayList<ProxyServiceListener> proxyServiceListeners;
+    private ArrayList<IProxyServiceListener> proxyServiceListeners;
 
     private ExtensionUI ui;
 
@@ -51,23 +55,26 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
         proxyServiceListeners = new ArrayList<>();
 
         //Setup preferences
-        this.preferences = new Preferences("Collaborator Authenticator", new DefaultGsonProvider(), logManager, callbacks);
-        this.preferences.addGlobalSetting(PREF_COLLABORATOR_ADDRESS, String.class, "burpcollaborator.net");
-        this.preferences.addGlobalSetting(PREF_POLLING_ADDRESS, String.class, "polling.burpcollaborator.net");
-        this.preferences.addGlobalSetting(PREF_POLLING_PORT, Integer.class, 443);
-        this.preferences.addGlobalSetting(PREF_REMOTE_SSL_ENABLED, Boolean.class, true);
-        this.preferences.addGlobalSetting(PREF_IGNORE_CERTIFICATE_ERRORS, Boolean.class, false);
-        this.preferences.addGlobalSetting(PREF_SSL_HOSTNAME_VERIFICATION, Boolean.class, true);
-        this.preferences.addGlobalSetting(PREF_LOCAL_PORT, Integer.class, 32541);
-        this.preferences.addGlobalSetting(PREF_SECRET, String.class, "Your Secret String");
-        this.preferences.addGlobalSetting(PREF_BLOCK_PUBLIC_COLLABORATOR, Boolean.class, false);
-        this.preferences.addGlobalSetting(PREF_PROXY_REQUESTS_WITH_BURP, Boolean.class, false);
-        this.preferences.addGlobalSetting(PREF_USE_AUTHENTICATION, Boolean.class, false);
-        this.preferences.addGlobalSetting(PREF_LOG_LEVEL, LogManager.LogLevel.class, LogManager.LogLevel.INFO);
-        this.preferences.addGlobalSetting(PREF_AUTO_START, Boolean.class, false);
+        DefaultGsonProvider gsonProvider = new DefaultGsonProvider();
+        gsonProvider.registerTypeAdapter(Interaction.class, new InteractionSerializer());
+
+        this.preferences = new Preferences("Collaborator Authenticator", gsonProvider, new StdOutLogger(), callbacks);
+        this.preferences.registerSetting(PREF_LOG_LEVEL, LogManager.LogLevel.class, LogManager.LogLevel.INFO, Preferences.Visibility.GLOBAL);
+        this.preferences.registerSetting(PREF_COLLABORATOR_ADDRESS, String.class, "burpcollaborator.net", Preferences.Visibility.GLOBAL);
+        this.preferences.registerSetting(PREF_POLLING_ADDRESS, String.class, "polling.burpcollaborator.net", Preferences.Visibility.GLOBAL);
+        this.preferences.registerSetting(PREF_POLLING_PORT, Integer.class, 443, Preferences.Visibility.GLOBAL);
+        this.preferences.registerSetting(PREF_REMOTE_SSL_ENABLED, Boolean.class, true, Preferences.Visibility.GLOBAL);
+        this.preferences.registerSetting(PREF_IGNORE_CERTIFICATE_ERRORS, Boolean.class, false, Preferences.Visibility.GLOBAL);
+        this.preferences.registerSetting(PREF_SSL_HOSTNAME_VERIFICATION, Boolean.class, true, Preferences.Visibility.GLOBAL);
+        this.preferences.registerSetting(PREF_LOCAL_PORT, Integer.class, 32541, Preferences.Visibility.GLOBAL);
+        this.preferences.registerSetting(PREF_SECRET, String.class, "Your Secret String", Preferences.Visibility.GLOBAL);
+        this.preferences.registerSetting(PREF_BLOCK_PUBLIC_COLLABORATOR, Boolean.class, false, Preferences.Visibility.PROJECT);
+        this.preferences.registerSetting(PREF_PROXY_REQUESTS_WITH_BURP, Boolean.class, false, Preferences.Visibility.GLOBAL);
+        this.preferences.registerSetting(PREF_USE_AUTHENTICATION, Boolean.class, false, Preferences.Visibility.GLOBAL);
+        this.preferences.registerSetting(PREF_AUTO_START, Boolean.class, false, Preferences.Visibility.GLOBAL);
         try {
-            this.preferences.addProjectSetting(PREF_ORIGINAL_COLLABORATOR_SETTINGS, String.class, "");
-            this.preferences.addProjectSetting(PREF_COLLABORATOR_HISTORY, new TypeToken<HashMap<String, CollaboratorContextManager.ContextInfo>>(){}.getType(), new HashMap<>());
+            this.preferences.registerSetting(PREF_ORIGINAL_COLLABORATOR_SETTINGS, String.class, "", Preferences.Visibility.PROJECT);
+            this.preferences.registerSetting(PREF_COLLABORATOR_HISTORY, new TypeToken<HashMap<String, ContextInfo>>(){}.getType(), new HashMap<>(), Preferences.Visibility.PROJECT);
             this.collaboratorContextManager = new CollaboratorContextManager(this);
         } catch (Exception e) {
             callbacks.printError("Could not initialize the project settings container. Unloading the extension.");
@@ -77,10 +84,19 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
 
         logManager.setLogLevel(this.preferences.getSetting(PREF_LOG_LEVEL));
 
+        //Clean up proxy service on startup failure.
+        this.addProxyServiceListener(new ProxyServiceAdapter() {
+            @Override
+            public void onStartupFail(String message) {
+                shutdownProxyService();
+            }
+        });
+
         SwingUtilities.invokeLater(() -> {
             this.ui = new ExtensionUI(this);
             CollaboratorPlusPlus.callbacks.addSuiteTab(this.ui);
             CollaboratorPlusPlus.callbacks.registerExtensionStateListener(this);
+            this.ui.addMenuItemsToBurp();
 
             if(this.preferences.getSetting(PREF_AUTO_START)){
                 new Thread(() -> {
@@ -97,10 +113,10 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
         }
     }
 
-    public void startCollaboratorProxy() throws IOException, URISyntaxException {
+    public void startCollaboratorProxy() throws URISyntaxException {
         if(isProxyServiceRunning()) throw new IllegalStateException("The proxy service is already running.");
 
-        for (ProxyServiceListener listener : proxyServiceListeners) {
+        for (IProxyServiceListener listener : proxyServiceListeners) {
             try {
                 listener.beforeStartup();
             }catch (Exception ignored){
@@ -108,9 +124,9 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
             }
         }
 
+        String collaboratorAddress = preferences.getSetting(PREF_COLLABORATOR_ADDRESS);
         if(preferences.getSetting(PREF_POLLING_ADDRESS).equals("")){
             logManager.logInfo("Polling location was not configured. Defaulting to the Collaborator address.");
-            String collaboratorAddress = preferences.getSetting(PREF_COLLABORATOR_ADDRESS);
             preferences.setSetting(PREF_POLLING_ADDRESS, collaboratorAddress);
         }
 
@@ -130,48 +146,33 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
 //            TEMPORARILY DISABLED UNTIL WORKING
 //            proxy = Utilities.getBurpProxyHost(pollingAddress.getScheme());
         }
-        proxyService = new ProxyService(collaboratorContextManager, listenPort, pollingAddress,
-                useAuthentication, secret, ignoreCertificateErrors, verifyHostname, proxy);
-
-        //Must set this before attempting to start the server to catch errors when starting the server
-        proxyService.setTestCallback((success, response) -> {
-            if (success) {
-                for (ProxyServiceListener proxyServiceListener : proxyServiceListeners) {
-                    proxyServiceListener.onStartupSuccess(response);
-                }
-            } else {
-                for (ProxyServiceListener proxyServiceListener : proxyServiceListeners) {
-                    proxyServiceListener.onStartupFail(response);
-                }
-                stopCollaboratorProxy();
-            }
-        });
 
         Utilities.backupCollaboratorConfig(preferences);
         callbacks.loadConfigFromJson(Utilities.buildPollingRedirectionConfig(preferences, listenPort));
 
+        //Build the proxy service with the required values.
+        proxyService = new ProxyService(collaboratorContextManager, proxyServiceListeners,
+                collaboratorAddress, listenPort, pollingAddress,
+                useAuthentication, secret, ignoreCertificateErrors, verifyHostname, proxy);
+
         proxyService.start();
-        if(proxyService != null) {
-            //If the proxy service threw an exception when starting, it will have been cleaned up already.
-            proxyService.testConnection();
-        }
     }
 
-    public void stopCollaboratorProxy(){
+    public void shutdownProxyService(){
         if(!isProxyServiceRunning()) throw new IllegalStateException("The proxy service is not running.");
         proxyService.stop();
-        logManager.logInfo("Polling Proxy Stopped...");
-        for (ProxyServiceListener proxyServiceListener : proxyServiceListeners) {
+        logManager.logInfo("Proxy Service Stopped...");
+        for (IProxyServiceListener proxyServiceListener : proxyServiceListeners) {
             proxyServiceListener.onShutdown();
         }
         Utilities.restoreCollaboratorConfig(preferences);
     }
 
-    public void addProxyServiceListener(ProxyServiceListener listener){
+    public void addProxyServiceListener(IProxyServiceListener listener){
         this.proxyServiceListeners.add(listener);
     }
 
-    public void removeProxyServiceListener(ProxyServiceListener listener){
+    public void removeProxyServiceListener(IProxyServiceListener listener){
         this.proxyServiceListeners.remove(listener);
     }
 
@@ -186,7 +187,7 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
     @Override
     public void extensionUnloaded() {
         try {
-            stopCollaboratorProxy();
+            shutdownProxyService();
         }catch (IllegalStateException ignored){}
 
         if(this.preferences.getSetting(PREF_BLOCK_PUBLIC_COLLABORATOR)){

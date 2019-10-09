@@ -5,10 +5,9 @@ import com.coreyd97.BurpExtenderUtilities.ComponentGroup;
 import com.coreyd97.BurpExtenderUtilities.PanelBuilder;
 import com.nccgroup.collaboratorplusplus.extension.CollaboratorPlusPlus;
 import com.nccgroup.collaboratorplusplus.extension.LogListener;
-import com.nccgroup.collaboratorplusplus.extension.ProxyServiceListener;
+import com.nccgroup.collaboratorplusplus.extension.IProxyServiceListener;
 import com.nccgroup.collaboratorplusplus.extension.Utilities;
 import com.nccgroup.collaboratorplusplus.utilities.LogManager;
-import org.apache.http.impl.bootstrap.HttpServer;
 
 import javax.swing.*;
 import javax.swing.text.DefaultCaret;
@@ -17,13 +16,11 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.IOException;
 import java.net.URISyntaxException;
-import java.util.concurrent.TimeUnit;
 
-import static com.nccgroup.collaboratorplusplus.extension.CollaboratorPlusPlus.callbacks;
 import static com.nccgroup.collaboratorplusplus.extension.CollaboratorPlusPlus.logManager;
 import static com.nccgroup.collaboratorplusplus.extension.Globals.*;
 
-public class ConfigUI extends JPanel implements LogListener, ProxyServiceListener {
+public class ConfigUI extends JPanel implements LogListener, IProxyServiceListener {
 
     private final CollaboratorPlusPlus extension;
     private JToggleButton startStopButton;
@@ -110,26 +107,40 @@ public class ConfigUI extends JPanel implements LogListener, ProxyServiceListene
 
 
         //Control Panel
-        ComponentGroup controlGroup = panelBuilder.createComponentGroup("Control");
         statusLabel = new JLabel("Status: Not Running");
         statusLabel.setHorizontalAlignment(SwingConstants.CENTER);
-        controlGroup.addComponent(statusLabel);
 
-        controlGroup.addPreferenceComponent(PREF_AUTO_START, "Start Automatically on Load");
-        startStopButton = controlGroup.addToggleButton("Start", actionEvent -> {
+        startStopButton = panelBuilder.createToggleButton("Start", actionEvent -> {
             JToggleButton thisButton = (JToggleButton) actionEvent.getSource();
             new Thread(() -> {
                 if(thisButton.isSelected()){
                     try {
                         this.extension.startCollaboratorProxy();
-                    } catch (IOException | URISyntaxException e) {
+                    } catch (URISyntaxException e) {
                         e.printStackTrace();
                     }
                 }else{
-                    this.extension.stopCollaboratorProxy();
+                    this.extension.shutdownProxyService();
                 }
             }).start();
         });
+        JComponent autoStart = panelBuilder.createPreferenceCheckBox(PREF_AUTO_START, "Start Automatically on Load");
+        JComponent controlGroup;
+        try{
+            controlGroup = panelBuilder.build(new JComponent[][]{
+                    new JComponent[]{statusLabel},
+                    new JComponent[]{autoStart},
+                    new JComponent[]{startStopButton},
+            }, new int[][]{
+                    new int[]{1},
+                    new int[]{0},
+                    new int[]{0},
+            }, Alignment.FILL, 1.0, 1.0);
+            controlGroup.setBorder(BorderFactory.createTitledBorder("Control"));
+        }catch (Exception e){
+            controlGroup = new JLabel("Could not build control panel :(");
+        }
+
 
         ComponentGroup secretGroup = panelBuilder.createComponentGroup("Collaborator Authentication");
         enableAuthentication = panelBuilder.createPreferenceCheckBox(PREF_USE_AUTHENTICATION, "Enable Authentication");
@@ -159,6 +170,7 @@ public class ConfigUI extends JPanel implements LogListener, ProxyServiceListene
         JScrollPane logScrollPane = new JScrollPane(logArea);
         logScrollPane.setBorder(BorderFactory.createLineBorder(Color.ORANGE));
         logScrollPane.setBorder(null);
+        logScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
         JPanel logLevelPanel = new JPanel(new GridLayout(1,2));
         JComboBox logLevelSelector = new JComboBox(LogManager.LogLevel.values());
         logLevelSelector.setSelectedItem(logManager.getLogLevel());
@@ -238,13 +250,13 @@ public class ConfigUI extends JPanel implements LogListener, ProxyServiceListene
 
         //Disable all other controls
         enableControls(false);
-
         startStopButton.setEnabled(true);
+        this.revalidate();
+        this.repaint();
     }
 
     @Override
     public void onShutdown() {
-        logManager.logInfo("Stopping local authentication proxy...");
         statusLabel.setText("Status: Not Running");
 
         //Reenable other controls
@@ -253,6 +265,8 @@ public class ConfigUI extends JPanel implements LogListener, ProxyServiceListene
         startStopButton.setEnabled(true);
         startStopButton.setSelected(false);
         startStopButton.setText("Start");
+        this.revalidate();
+        this.repaint();
     }
 
     private void enableControls(boolean enabled){

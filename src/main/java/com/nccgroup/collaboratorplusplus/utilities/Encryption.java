@@ -5,10 +5,7 @@ import javax.crypto.*;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
-import java.security.AlgorithmParameters;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
+import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.InvalidParameterSpecException;
 import java.security.spec.KeySpec;
@@ -16,7 +13,7 @@ import java.util.Arrays;
 
 public class Encryption {
 
-    private static SecretKey generateKey(String secret) throws NoSuchAlgorithmException, InvalidKeySpecException {
+    private static SecretKey generateKey(String secret) throws GeneralSecurityException {
         SecretKeyFactory keyFactory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
         KeySpec keySpec = new PBEKeySpec(secret.toCharArray(), "CollaboratorAuth".getBytes(), 128, 256);
         SecretKey tmpSecret = keyFactory.generateSecret(keySpec);
@@ -25,7 +22,7 @@ public class Encryption {
     }
 
 
-    public static byte[] aesEncryptRequest(String secret, String request) throws InvalidKeySpecException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidParameterSpecException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
+    public static byte[] aesEncryptRequest(String secret, String request) throws GeneralSecurityException {
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
         SecretKey secretKey = generateKey(secret);
         cipher.init(Cipher.ENCRYPT_MODE, secretKey);
@@ -40,7 +37,7 @@ public class Encryption {
     }
 
 
-    public static String aesDecryptRequest(String secret, byte[] encryptedWithIv) throws InvalidKeySpecException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException, InvalidAlgorithmParameterException {
+    public static String aesDecryptRequest(String secret, byte[] encryptedWithIv) throws GeneralSecurityException {
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
         SecretKey secretKey = generateKey(secret);
         byte[] iv = Arrays.copyOfRange(encryptedWithIv, 0, 16);

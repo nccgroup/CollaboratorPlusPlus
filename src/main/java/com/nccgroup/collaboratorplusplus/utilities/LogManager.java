@@ -7,7 +7,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
 
-public class LogManager implements ILogProvider {
+public class LogManager {
 
     public enum LogLevel {INFO, ERROR, DEBUG;}
     private final ArrayList<LogListener> logListeners;
@@ -15,7 +15,7 @@ public class LogManager implements ILogProvider {
 
     public LogManager(){
         this.logListeners = new ArrayList();
-        this.logLevel = LogLevel.INFO;
+        this.logLevel = LogLevel.DEBUG;
     }
 
     public LogLevel getLogLevel() {
@@ -40,11 +40,6 @@ public class LogManager implements ILogProvider {
                 logListener.onInfo(message);
             }
         }
-    }
-
-    @Override
-    public void logOutput(String message) {
-        logInfo(message);
     }
 
     public void logError(String message){

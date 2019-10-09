@@ -1,4 +1,4 @@
-package com.nccgroup.collaboratorplusplus.extension.ui;
+package com.nccgroup.collaboratorplusplus.utilities;
 
 import javax.swing.*;
 import javax.swing.text.*;
