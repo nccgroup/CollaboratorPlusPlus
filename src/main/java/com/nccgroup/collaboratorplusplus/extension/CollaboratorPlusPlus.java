@@ -5,21 +5,17 @@ import burp.IBurpExtenderCallbacks;
 import burp.IExtensionStateListener;
 import com.coreyd97.BurpExtenderUtilities.DefaultGsonProvider;
 import com.coreyd97.BurpExtenderUtilities.Preferences;
-import com.coreyd97.BurpExtenderUtilities.StdOutLogger;
-import com.google.gson.reflect.TypeToken;
 import com.nccgroup.collaboratorplusplus.extension.context.CollaboratorContextManager;
-import com.nccgroup.collaboratorplusplus.extension.context.ContextInfo;
-import com.nccgroup.collaboratorplusplus.extension.context.Interaction;
-import com.nccgroup.collaboratorplusplus.extension.context.InteractionSerializer;
 import com.nccgroup.collaboratorplusplus.extension.ui.ExtensionUI;
 import com.nccgroup.collaboratorplusplus.utilities.LogManager;
 import org.apache.http.HttpHost;
 
 import javax.swing.*;
+import java.awt.*;
+import java.awt.event.WindowEvent;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
-import java.util.HashMap;
 
 import static com.nccgroup.collaboratorplusplus.extension.Globals.*;
 
@@ -56,31 +52,9 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
 
         //Setup preferences
         DefaultGsonProvider gsonProvider = new DefaultGsonProvider();
-        gsonProvider.registerTypeAdapter(Interaction.class, new InteractionSerializer());
+        this.preferences = new CollaboratorPreferenceFactory(gsonProvider, callbacks).buildPreferences();
 
-        this.preferences = new Preferences("Collaborator Authenticator", gsonProvider, new StdOutLogger(), callbacks);
-        this.preferences.registerSetting(PREF_LOG_LEVEL, LogManager.LogLevel.class, LogManager.LogLevel.INFO, Preferences.Visibility.GLOBAL);
-        this.preferences.registerSetting(PREF_COLLABORATOR_ADDRESS, String.class, "burpcollaborator.net", Preferences.Visibility.GLOBAL);
-        this.preferences.registerSetting(PREF_POLLING_ADDRESS, String.class, "polling.burpcollaborator.net", Preferences.Visibility.GLOBAL);
-        this.preferences.registerSetting(PREF_POLLING_PORT, Integer.class, 443, Preferences.Visibility.GLOBAL);
-        this.preferences.registerSetting(PREF_REMOTE_SSL_ENABLED, Boolean.class, true, Preferences.Visibility.GLOBAL);
-        this.preferences.registerSetting(PREF_IGNORE_CERTIFICATE_ERRORS, Boolean.class, false, Preferences.Visibility.GLOBAL);
-        this.preferences.registerSetting(PREF_SSL_HOSTNAME_VERIFICATION, Boolean.class, true, Preferences.Visibility.GLOBAL);
-        this.preferences.registerSetting(PREF_LOCAL_PORT, Integer.class, 32541, Preferences.Visibility.GLOBAL);
-        this.preferences.registerSetting(PREF_SECRET, String.class, "Your Secret String", Preferences.Visibility.GLOBAL);
-        this.preferences.registerSetting(PREF_BLOCK_PUBLIC_COLLABORATOR, Boolean.class, false, Preferences.Visibility.PROJECT);
-        this.preferences.registerSetting(PREF_PROXY_REQUESTS_WITH_BURP, Boolean.class, false, Preferences.Visibility.GLOBAL);
-        this.preferences.registerSetting(PREF_USE_AUTHENTICATION, Boolean.class, false, Preferences.Visibility.GLOBAL);
-        this.preferences.registerSetting(PREF_AUTO_START, Boolean.class, false, Preferences.Visibility.GLOBAL);
-        try {
-            this.preferences.registerSetting(PREF_ORIGINAL_COLLABORATOR_SETTINGS, String.class, "", Preferences.Visibility.PROJECT);
-            this.preferences.registerSetting(PREF_COLLABORATOR_HISTORY, new TypeToken<HashMap<String, ContextInfo>>(){}.getType(), new HashMap<>(), Preferences.Visibility.PROJECT);
-            this.collaboratorContextManager = new CollaboratorContextManager(this);
-        } catch (Exception e) {
-            callbacks.printError("Could not initialize the project settings container. Unloading the extension.");
-            e.printStackTrace();
-            callbacks.unloadExtension();
-        }
+        this.collaboratorContextManager = new CollaboratorContextManager(this);
 
         logManager.setLogLevel(this.preferences.getSetting(PREF_LOG_LEVEL));
 
