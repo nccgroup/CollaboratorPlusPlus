@@ -48,6 +48,16 @@ public class ExtensionUI implements ITab, IExtensionStateListener {
         }
     }
 
+    public JComponent getTabForExtension(){
+        JTabbedPane mainPane = getBurpTabbedPane();
+        int tabIndex = mainPane.indexOfComponent(this.popOutPanel);
+        return (JComponent) mainPane.getTabComponentAt(tabIndex);
+    }
+
+    public JTabbedPane getBurpTabbedPane(){
+        return (JTabbedPane) this.popOutPanel.getParent();
+    }
+
     @Override
     public void extensionUnloaded() {
         removeMenuItemsFromBurp();

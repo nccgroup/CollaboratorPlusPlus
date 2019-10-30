@@ -39,15 +39,6 @@ public class ContextInfo {
         return lastPolled;
     }
 
-    static ArrayList<Interaction> parseInteractions(ContextInfo contextInfo, JsonArray jsonArray){
-        ArrayList<Interaction> interactions = new ArrayList<>();
-        for (JsonElement jsonElement : jsonArray) {
-            Interaction interaction = Interaction.parseFromJson(contextInfo, jsonElement.getAsJsonObject());
-            if(interaction != null) interactions.add(interaction);
-        }
-        return interactions;
-    }
-
     void addInteractions(ArrayList<Interaction> interactions){
         if(recentInteractions == null) recentInteractions = new ArrayList<>();
         for (Interaction interaction : interactions) {

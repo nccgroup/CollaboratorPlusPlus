@@ -65,6 +65,7 @@ public class SMTPInteraction extends Interaction{
         return new PanelBuilder(null).build(new Component[][]{
                 new Component[]{basePanel, basePanel},
                 new Component[]{new JSeparator(JSeparator.HORIZONTAL), new JSeparator(JSeparator.HORIZONTAL)},
+                new Component[]{new JLabel("Sender:  "), new SelectableLabel(sender)},
                 new Component[]{new JLabel("Recipients:  "), new SelectableLabel(this.recipients.stream().collect(Collectors.joining("; ")))},
                 new Component[]{editor.getComponent(), editor.getComponent()},
         }, new int[][]{

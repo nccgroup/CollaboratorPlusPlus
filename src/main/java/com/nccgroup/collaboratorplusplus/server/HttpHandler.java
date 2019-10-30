@@ -23,6 +23,7 @@ import javax.crypto.NoSuchPaddingException;
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.net.URL;
+import java.security.GeneralSecurityException;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
@@ -120,7 +121,7 @@ public class HttpHandler implements HttpRequestHandler {
         CollaboratorServer.logManager.logDebug(response.toString());
     }
 
-    private ByteArrayEntity createEncryptedResponse(String message) throws NoSuchAlgorithmException, InvalidKeySpecException, IllegalBlockSizeException, InvalidKeyException, BadPaddingException, InvalidParameterSpecException, NoSuchPaddingException {
+    private ByteArrayEntity createEncryptedResponse(String message) throws GeneralSecurityException {
         byte[] encrypted = Encryption.aesEncryptRequest(this.secret, message);
         return new ByteArrayEntity(encrypted);
     }

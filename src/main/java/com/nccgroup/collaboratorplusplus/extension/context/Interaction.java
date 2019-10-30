@@ -102,4 +102,15 @@ public abstract class Interaction {
         }
         return null;
     }
+
+    public static Interaction parseFromJson(JsonObject json){
+        switch(json.getAsJsonObject().get("protocol").getAsString().toUpperCase()){
+            case "DNS": return new DNSInteraction(json);
+            case "HTTP": return new HTTPInteraction(json, false);
+            case "HTTPS": return new HTTPInteraction(json, true);
+            case "SMTP": return new SMTPInteraction(json, false);
+            case "SMTPS": return new SMTPInteraction(json, true);
+        }
+        return null;
+    }
 }

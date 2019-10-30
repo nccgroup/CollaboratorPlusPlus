@@ -21,7 +21,7 @@ public class InteractionsTable extends JTable {
     private final CollaboratorContextManager contextManager;
     ContextInfo contextInfo;
 
-    InteractionsTable(CollaboratorContextManager contextManager){
+    InteractionsTable(CollaboratorContextManager contextManager) {
         this.setModel(new InteractionsTableModel());
         this.setAutoCreateRowSorter(true);
         this.contextManager = contextManager;
@@ -29,10 +29,8 @@ public class InteractionsTable extends JTable {
         this.registerCollaboratorEventListeners();
 
         this.getSelectionModel().addListSelectionListener(e -> {
-            if(contextInfo != null && contextInfo.getRecentInteractions() != null) {
-                UUID selectedUUID = contextInfo.getInteractionIds().get(e.getFirstIndex());
-                contextInfo.getRecentInteractions().remove(selectedUUID);
-                selectedUUID = contextInfo.getInteractionIds().get(e.getLastIndex());
+            if (contextInfo != null && contextInfo.getRecentInteractions() != null && this.getSelectedRow() != -1) {
+                UUID selectedUUID = contextInfo.getInteractionIds().get(convertRowIndexToModel(this.getSelectedRow()));
                 contextInfo.getRecentInteractions().remove(selectedUUID);
             }
         });
@@ -42,17 +40,20 @@ public class InteractionsTable extends JTable {
         this.contextManager.addEventListener(new CollaboratorEventAdapter() {
             @Override
             public void onPollingResponseReceived(String biid, ArrayList<Interaction> interactions) {
-                if(InteractionsTable.this.contextInfo != null && InteractionsTable.this.contextInfo.getIdentifier().equalsIgnoreCase(biid)){
-                    int initialSize = contextInfo.getInteractionEvents().size()-interactions.size();
+                SwingUtilities.invokeLater(() -> {
+                    if (interactions.size() > 0 && InteractionsTable.this.contextInfo != null
+                            && InteractionsTable.this.contextInfo.getIdentifier().equalsIgnoreCase(biid)) {
+                        int initialSize = contextInfo.getInteractionEvents().size() - interactions.size();
 
-                    try {
-                        ((AbstractTableModel) InteractionsTable.this.getModel()).fireTableRowsInserted(
-                                initialSize, InteractionsTable.this.getModel().getRowCount()-1);
-                    }catch (Exception e){
-                        e.printStackTrace();
-                        CollaboratorPlusPlus.logManager.logError(e);
+                        try {
+                            ((AbstractTableModel) InteractionsTable.this.getModel()).fireTableRowsInserted(
+                                    initialSize, InteractionsTable.this.getModel().getRowCount() - 1);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            CollaboratorPlusPlus.logManager.logError(e);
+                        }
                     }
-                }
+                });
             }
         });
     }
@@ -60,21 +61,20 @@ public class InteractionsTable extends JTable {
     //Sneak in row coloring just before rendering the cell.
     //Highlight recent interactions which have not yet been viewed.
     @Override
-    public Component prepareRenderer(TableCellRenderer renderer, int row, int column)
-    {
+    public Component prepareRenderer(TableCellRenderer renderer, int row, int column) {
         Component c = super.prepareRenderer(renderer, row, column);
 
-        if(row == this.getSelectedRow()) {
+        if (row == this.getSelectedRow()) {
             c.setForeground(this.getSelectionForeground());
             c.setBackground(this.getSelectionBackground());
             return c;
         }
 
-        UUID targetUUID = contextInfo.getInteractionIds().get(row);
-        if(contextInfo.getRecentInteractions() != null && contextInfo.getRecentInteractions().contains(targetUUID)){
+        UUID targetUUID = contextInfo.getInteractionIds().get(convertRowIndexToModel(row));
+        if (contextInfo.getRecentInteractions() != null && contextInfo.getRecentInteractions().contains(targetUUID)) {
             c.setBackground(Color.ORANGE);
             c.setForeground(Color.WHITE);
-        }else{
+        } else {
             c.setForeground(this.getForeground());
             c.setBackground(this.getBackground());
         }
@@ -83,8 +83,8 @@ public class InteractionsTable extends JTable {
     }
 
 
-    void setContext(ContextInfo collaboratorContext){
-        if(this.contextInfo != collaboratorContext) {
+    void setContext(ContextInfo collaboratorContext) {
+        if (this.contextInfo != collaboratorContext) {
             this.contextInfo = collaboratorContext;
             ((AbstractTableModel) this.getModel()).fireTableDataChanged();
         }
@@ -94,7 +94,7 @@ public class InteractionsTable extends JTable {
 
         @Override
         public int getRowCount() {
-            if(contextInfo == null) return 0;
+            if (contextInfo == null) return 0;
             return contextInfo.getInteractionEvents().size();
         }
 
@@ -105,25 +105,33 @@ public class InteractionsTable extends JTable {
 
         @Override
         public String getColumnName(int column) {
-            switch (column){
-                case 0: return "Interaction String";
-                case 1: return "Protocol";
-                case 2: return "Time";
-                case 3: return "Client";
+            switch (column) {
+                case 0:
+                    return "Interaction String";
+                case 1:
+                    return "Protocol";
+                case 2:
+                    return "Time";
+                case 3:
+                    return "Client";
             }
             return null;
         }
 
         @Override
         public Object getValueAt(int rowIndex, int columnIndex) {
-            if(contextInfo == null || rowIndex >= contextInfo.getInteractionEvents().size()) return null;
+            if (contextInfo == null || rowIndex >= contextInfo.getInteractionEvents().size()) return null;
             Interaction interaction = contextInfo.getEventAtIndex(rowIndex);
 
-            switch (columnIndex){
-                case 0: return interaction.getInteractionString();
-                case 1: return interaction.getInteractionType();
-                case 2: return DATE_FORMAT.format(interaction.getTime());
-                case 3: return interaction.getClient();
+            switch (columnIndex) {
+                case 0:
+                    return interaction.getInteractionString();
+                case 1:
+                    return interaction.getInteractionType();
+                case 2:
+                    return DATE_FORMAT.format(interaction.getTime());
+                case 3:
+                    return interaction.getClient();
             }
 
             return null;

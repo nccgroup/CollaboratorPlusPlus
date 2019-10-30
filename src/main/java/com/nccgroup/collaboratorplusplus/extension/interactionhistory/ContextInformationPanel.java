@@ -6,10 +6,13 @@ import com.coreyd97.BurpExtenderUtilities.Preferences;
 import com.nccgroup.collaboratorplusplus.extension.CollaboratorEventAdapter;
 import com.nccgroup.collaboratorplusplus.extension.context.CollaboratorContextManager;
 import com.nccgroup.collaboratorplusplus.extension.context.ContextInfo;
+import com.nccgroup.collaboratorplusplus.extension.context.Interaction;
 import com.nccgroup.collaboratorplusplus.utilities.SelectableLabel;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 
 class ContextInformationPanel extends JPanel {
 
@@ -21,6 +24,7 @@ class ContextInformationPanel extends JPanel {
     JLabel lastPolledLabel;
     InteractionInfoPanel interactionInformationPanel;
     JButton pollNowButton;
+    Color originalLastPolledColor;
 
     InteractionsTable interactionsTable;
 
@@ -47,13 +51,13 @@ class ContextInformationPanel extends JPanel {
         identifierLabel = new SelectableLabel("N/A");
         lastPolledLabel = new JLabel("N/A");
         pollNowButton = new JButton("Poll Now");
+        originalLastPolledColor = lastPolledLabel.getForeground();
 
         pollNowButton.setEnabled(false);
         pollNowButton.addActionListener(e -> {
             try {
                 contextManager.requestInteractions(selectedContext.getIdentifier());
             } catch (Exception e1) {
-                e1.printStackTrace();
                 JOptionPane.showMessageDialog(this, "Could not retrieve interactions:\n"
                         + e1.getMessage(), "Polling Error", JOptionPane.ERROR_MESSAGE);
             }
@@ -97,7 +101,8 @@ class ContextInformationPanel extends JPanel {
         this.interactionsTable.getSelectionModel().addListSelectionListener(e -> {
             int selectedRow = interactionsTable.getSelectedRow();
             if(selectedRow == -1) return;
-            interactionInformationPanel.setActiveInteraction(selectedContext.getEventAtIndex(selectedRow));
+            Interaction selectedInteraction = selectedContext.getEventAtIndex(interactionsTable.convertRowIndexToModel(selectedRow));
+            interactionInformationPanel.setActiveInteraction(selectedInteraction);
         });
 
         this.contextManager.addEventListener(new CollaboratorEventAdapter() {
@@ -105,16 +110,11 @@ class ContextInformationPanel extends JPanel {
             public void onPollingRequestSent(String biid, boolean isFirstPoll) {
                 if(selectedContext != null && biid.equalsIgnoreCase(selectedContext.getIdentifier())){
                     lastPolledLabel.setText(selectedContext.getLastPolled().toString());
-                    new Thread(() -> {
-                        Color foreground = lastPolledLabel.getForeground();
-                        lastPolledLabel.setForeground(Color.ORANGE);
-                        try {
-                            Thread.sleep(1000);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                        lastPolledLabel.setForeground(foreground);
-                    }).start();
+                    lastPolledLabel.setForeground(Color.ORANGE);
+
+                    Timer colorResetTimer = new Timer(1000, e -> lastPolledLabel.setForeground(originalLastPolledColor));
+                    colorResetTimer.setRepeats(false);
+                    colorResetTimer.start();
                 }
             }
         });

@@ -5,6 +5,7 @@ import com.coreyd97.BurpExtenderUtilities.Alignment;
 import com.coreyd97.BurpExtenderUtilities.PanelBuilder;
 import com.google.gson.JsonObject;
 import com.nccgroup.collaboratorplusplus.extension.CollaboratorPlusPlus;
+import com.nccgroup.collaboratorplusplus.extension.DNSQueryType;
 import com.nccgroup.collaboratorplusplus.utilities.SelectableLabel;
 import com.nccgroup.collaboratorplusplus.utilities.StaticHTTPMessageController;
 import org.bouncycastle.util.encoders.Base64;
@@ -43,11 +44,14 @@ public class DNSInteraction extends Interaction {
         subdomainPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
         subdomainPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         subdomainPane.setMinimumSize(new Dimension(subdomainPane.getWidth(), 40));
+        SelectableLabel dnsTypeLabel
+                = new SelectableLabel(String.format("%s(%d)", DNSQueryType.getTypeByCode(this.type), this.type));
+
         return new PanelBuilder(null).build(new Component[][]{
                 new Component[]{basePanel, basePanel},
                 new Component[]{new JSeparator(JSeparator.HORIZONTAL), new JSeparator(JSeparator.HORIZONTAL)},
                 new Component[]{new JLabel("SubDomain:  "), subdomainPane},
-                new Component[]{new JLabel("Type:  "), new SelectableLabel(String.valueOf(this.type))},
+                new Component[]{new JLabel("Type:  "), dnsTypeLabel},
                 new Component[]{editor.getComponent(), editor.getComponent()},
         }, new int[][]{
                 new int[]{0, 0},

@@ -10,6 +10,7 @@ import com.nccgroup.collaboratorplusplus.extension.Utilities;
 import com.nccgroup.collaboratorplusplus.utilities.LogManager;
 
 import javax.swing.*;
+import javax.swing.border.TitledBorder;
 import javax.swing.text.DefaultCaret;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
@@ -142,22 +143,27 @@ public class ConfigUI extends JPanel implements LogListener, IProxyServiceListen
         }
 
 
-        ComponentGroup secretGroup = panelBuilder.createComponentGroup("Collaborator Authentication");
+        ComponentGroup authenticationPanel = panelBuilder.createComponentGroup("Collaborator Authentication");
         enableAuthentication = panelBuilder.createPreferenceCheckBox(PREF_USE_AUTHENTICATION, "Enable Authentication");
-        enableAuthentication.setBorder(BorderFactory.createEmptyBorder(0,0,10,0));
+        enableAuthentication.setBorder(BorderFactory.createEmptyBorder(0,0,10,30));
         enableAuthentication.addActionListener(e -> {
             secretArea.setEnabled(enableAuthentication.isSelected());
         });
-        GridBagConstraints gbc = secretGroup.generateNextConstraints();
-        gbc.weighty = 0;
-        secretGroup.addComponent(enableAuthentication, gbc);
+        authenticationPanel.addComponent(enableAuthentication);
 
+        ComponentGroup secretInputPanel = panelBuilder.createComponentGroup("Shared Secret");
         secretArea = panelBuilder.createPreferenceTextArea(PREF_SECRET);
         secretArea.setLineWrap(true);
         secretArea.setEnabled(extension.getPreferences().getSetting(PREF_USE_AUTHENTICATION));
         JScrollPane secretScrollPane = new JScrollPane(secretArea);
-        secretScrollPane.setBorder(BorderFactory.createTitledBorder(BorderFactory.createLineBorder(Color.GRAY), "Shared Secret"));
-        secretGroup.addComponent(secretScrollPane);
+        secretScrollPane.setBorder(BorderFactory.createEmptyBorder());
+        secretInputPanel.addComponent(secretScrollPane);
+
+        JPanel authenticationWrapperPanel = panelBuilder.build(new Component[][]{
+                new Component[]{authenticationPanel, secretInputPanel}
+        }, new int[][]{
+                new int[]{0, 1}
+        }, Alignment.FILL, 1.0, 1.0);
 
         ComponentGroup logGroup = panelBuilder.createComponentGroup("Message Log");
         logArea = new JTextArea();
@@ -200,8 +206,10 @@ public class ConfigUI extends JPanel implements LogListener, IProxyServiceListen
             return panelBuilder.build(
                 new JComponent[][]{
                     new JComponent[]{configGroup, controlGroup},
-                    new JComponent[]{secretGroup, logGroup},
+                    new JComponent[]{authenticationWrapperPanel, authenticationWrapperPanel},
+                    new JComponent[]{logGroup, logGroup},
                 }, new int[][]{
+                    new int[]{0, 0},
                     new int[]{0, 0},
                     new int[]{1 ,1},
                 }, Alignment.TOPMIDDLE, 1, 1);

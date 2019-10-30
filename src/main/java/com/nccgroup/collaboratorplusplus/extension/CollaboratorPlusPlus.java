@@ -6,9 +6,11 @@ import burp.IExtensionStateListener;
 import com.coreyd97.BurpExtenderUtilities.DefaultGsonProvider;
 import com.coreyd97.BurpExtenderUtilities.Preferences;
 import com.nccgroup.collaboratorplusplus.extension.context.CollaboratorContextManager;
+import com.nccgroup.collaboratorplusplus.extension.context.Interaction;
 import com.nccgroup.collaboratorplusplus.extension.ui.ExtensionUI;
 import com.nccgroup.collaboratorplusplus.utilities.LogManager;
 import org.apache.http.HttpHost;
+import org.apache.http.impl.bootstrap.HttpServer;
 
 import javax.swing.*;
 import java.awt.*;
@@ -30,6 +32,9 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
     private ArrayList<IProxyServiceListener> proxyServiceListeners;
 
     private ExtensionUI ui;
+    private BurpTabController burpTabController;
+
+    private HttpServer oldServer;
 
     public CollaboratorPlusPlus(){
         //Fix Darcula's issue with JSpinner UI.
@@ -53,25 +58,58 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
         //Setup preferences
         DefaultGsonProvider gsonProvider = new DefaultGsonProvider();
         this.preferences = new CollaboratorPreferenceFactory(gsonProvider, callbacks).buildPreferences();
-
         this.collaboratorContextManager = new CollaboratorContextManager(this);
-
         logManager.setLogLevel(this.preferences.getSetting(PREF_LOG_LEVEL));
 
-        //Clean up proxy service on startup failure.
+        //Clean up proxy service on startup failure and color tab when running/stopped
         this.addProxyServiceListener(new ProxyServiceAdapter() {
+
+            @Override
+            public void onStartupSuccess(String message) {
+                burpTabController.setTabColor(Color.GREEN);
+                oldServer = proxyService.getServer();
+            }
+
             @Override
             public void onStartupFail(String message) {
                 shutdownProxyService();
             }
+
+            @Override
+            public void onShutdown() {
+                burpTabController.setTabColor(Color.RED);
+            }
         });
 
+        //Color tab orange if errors, green if working correctly.
+        this.collaboratorContextManager.addEventListener(new CollaboratorEventAdapter() {
+            @Override
+            public void onPollingResponseReceived(String biid, ArrayList<Interaction> interactions) {
+                burpTabController.setTabColor(Color.GREEN);
+            }
+
+            @Override
+            public void onPollingFailure(String error) {
+                burpTabController.setTabColor(Color.ORANGE);
+            }
+        });
+
+
         SwingUtilities.invokeLater(() -> {
+            CollaboratorPlusPlus.callbacks.registerExtensionStateListener(this);
+
+            //Create UI and ask burp to add its tab.
             this.ui = new ExtensionUI(this);
             CollaboratorPlusPlus.callbacks.addSuiteTab(this.ui);
-            CollaboratorPlusPlus.callbacks.registerExtensionStateListener(this);
-            this.ui.addMenuItemsToBurp();
+            //Use the ui component to get the parent tabbed pane.
+            JTabbedPane burpTabbedPane = this.ui.getBurpTabbedPane();
+            //Setup tab controller using the main tabbed panel we found.
+            this.burpTabController = new BurpTabController(burpTabbedPane, this.ui.getUiComponent(), null, null);
 
+            //Start off the tab as red, until we've started up.
+            burpTabController.setTabColor(Color.RED);
+
+            this.ui.addMenuItemsToBurp();
             if(this.preferences.getSetting(PREF_AUTO_START)){
                 new Thread(() -> {
                     try {
@@ -129,7 +167,49 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
                 collaboratorAddress, listenPort, pollingAddress,
                 useAuthentication, secret, ignoreCertificateErrors, verifyHostname, proxy);
 
+        if(tryCloseCollaboratorWindows() && getCollaboratorFrames().size() > 0){
+            //User accepted request to close collaborator windows.
+            JOptionPane.showMessageDialog(this.ui.getUiComponent(),
+                    "A Collaborator client window was not closed. Its interactions will not be captured.",
+                    "Collaborator client warning", JOptionPane.WARNING_MESSAGE);
+        }
+
         proxyService.start();
+    }
+
+    private ArrayList<Frame> getCollaboratorFrames(){
+        Frame[] frames = Frame.getFrames();
+        ArrayList<Frame> collaboratorFrames = new ArrayList<>();
+        for (Frame frame : frames) {
+            if(frame.getTitle().equalsIgnoreCase("Burp Collaborator client") && frame.isShowing()){
+                collaboratorFrames.add(frame);
+            }
+        }
+        return collaboratorFrames;
+    }
+
+    /**
+     * Check for any open collaborator windows and ask user if it's okay to close them and proceed.
+     * @return boolean True if its okay to proceed.
+     */
+    public boolean tryCloseCollaboratorWindows(){
+        ArrayList<Frame> collaboratorFrames = getCollaboratorFrames();
+        if(collaboratorFrames.size() == 0) return true;
+
+        if(JOptionPane.showConfirmDialog(ui.getUiComponent(), "Collaborator++ has detected open collaborator client windows.\n" +
+                        "It is recommended that existing Collaborator clients are closed and reopened once Collaborator++ is running, or it will not be able to detect these interactions.\n\n" +
+                        "Close them now?",
+                "Existing Collaborator Windows", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE) == JOptionPane.NO_OPTION){
+            return false;
+        }
+
+        for (Frame collaboratorFrame : collaboratorFrames) {
+            //Cannot simply close the windows. We must trigger the close event to make sure
+            //Burp shuts down the scheduled polling event.
+            collaboratorFrame.dispatchEvent(new WindowEvent(collaboratorFrame, WindowEvent.WINDOW_CLOSING));
+        }
+
+        return true;
     }
 
     public void shutdownProxyService(){

@@ -6,6 +6,7 @@ import com.google.gson.JsonParser;
 import com.nccgroup.collaboratorplusplus.extension.CollaboratorEventListener;
 import com.nccgroup.collaboratorplusplus.extension.CollaboratorPlusPlus;
 import com.nccgroup.collaboratorplusplus.extension.Globals;
+import com.nccgroup.collaboratorplusplus.extension.Utilities;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
 import org.apache.http.util.EntityUtils;
@@ -49,7 +50,7 @@ public class CollaboratorContextManager {
         }
     }
 
-    public void interactionEventsReceived(String collaboratorAddress, String identifier, JsonArray interactionArray){
+    public void addInteractions(String collaboratorAddress, String identifier, ArrayList<Interaction> interactions){
         if(!this.collaboratorHistory.containsKey(identifier)){
             this.collaboratorHistory.put(identifier, new ContextInfo(collaboratorAddress, identifier));
             this.identifiers.add(identifier);
@@ -57,7 +58,6 @@ public class CollaboratorContextManager {
 
         //Parse our interactions
         ContextInfo contextInfo = this.collaboratorHistory.get(identifier);
-        ArrayList<Interaction> interactions = ContextInfo.parseInteractions(contextInfo, interactionArray);
         contextInfo.addInteractions(interactions);
 
         saveState();
@@ -71,19 +71,19 @@ public class CollaboratorContextManager {
         }
     }
 
-    public JsonArray requestInteractions(String identifier) throws Exception {
-        if(extension.getProxyService() == null) throw new Exception("The collaborator proxy is not running.");
-
-        HttpResponse response = extension.getProxyService().requestInteractionsForContext(identifier);
-        if(response.getStatusLine().getStatusCode() == HttpStatus.SC_OK){
-            String responseString = EntityUtils.toString(response.getEntity());
-            JsonObject responseJson = new JsonParser().parse(responseString).getAsJsonObject();
-            if(responseJson.has("responses"))
-                return responseJson.getAsJsonArray( "responses");
-            else
-                return new JsonArray();
+    public void pollingFailure(String message){
+        for (CollaboratorEventListener eventListener : eventListeners) {
+            try {
+                eventListener.onPollingFailure(message);
+            }catch (Exception ignored){
+                ignored.printStackTrace();
+            }
         }
-        return null;
+    }
+
+    public ArrayList<Interaction> requestInteractions(String identifier) throws Exception {
+        if(extension.getProxyService() == null) throw new Exception("The collaborator proxy is not running.");
+        return  extension.getProxyService().requestInteractionsForContext(identifier);
     }
 
     public void saveState(){

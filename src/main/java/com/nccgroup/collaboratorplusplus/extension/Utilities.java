@@ -6,15 +6,49 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.nccgroup.collaboratorplusplus.extension.context.ContextInfo;
+import com.nccgroup.collaboratorplusplus.extension.context.Interaction;
 import org.apache.http.HttpHost;
 
 import java.net.Inet4Address;
+import java.util.ArrayList;
 
 import static com.nccgroup.collaboratorplusplus.extension.CollaboratorPlusPlus.logManager;
 import static com.nccgroup.collaboratorplusplus.extension.CollaboratorPlusPlus.callbacks;
 import static com.nccgroup.collaboratorplusplus.extension.Globals.*;
 
 public class Utilities {
+
+    public static ArrayList<Interaction> parseInteractions(JsonObject collaboratorResponse){
+        ArrayList<Interaction> interactions = new ArrayList<>();
+        if(collaboratorResponse.has("responses")) {
+            JsonArray jsonArray = collaboratorResponse.get("responses").getAsJsonArray();
+            for (JsonElement jsonElement : jsonArray) {
+                Interaction interaction = Interaction.parseFromJson(jsonElement.getAsJsonObject());
+                if (interaction != null) interactions.add(interaction);
+            }
+        }
+        return interactions;
+    }
+
+    public static JsonObject convertInteractionsToCollaboratorResponse(ArrayList<Interaction> interactions){
+        JsonObject json = new JsonObject();
+        JsonArray interactionArray = new JsonArray(interactions.size());
+        for (Interaction interaction : interactions) {
+            interactionArray.add(interaction.getOriginalObject());
+        }
+        json.add("responses", interactionArray);
+        return json;
+    }
+
+    public static ArrayList<Interaction> parseInteractions(ContextInfo contextInfo, JsonArray jsonArray){
+        ArrayList<Interaction> interactions = new ArrayList<>();
+        for (JsonElement jsonElement : jsonArray) {
+            Interaction interaction = Interaction.parseFromJson(contextInfo, jsonElement.getAsJsonObject());
+            if(interaction != null) interactions.add(interaction);
+        }
+        return interactions;
+    }
 
     public static HttpHost getBurpProxyHost(String scheme) {
         String configString = callbacks.saveConfigAsJson("proxy.request_listeners");

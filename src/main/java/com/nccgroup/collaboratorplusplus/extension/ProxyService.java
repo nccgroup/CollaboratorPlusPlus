@@ -1,14 +1,18 @@
 package com.nccgroup.collaboratorplusplus.extension;
 
+import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.nccgroup.collaboratorplusplus.extension.context.CollaboratorContextManager;
+import com.nccgroup.collaboratorplusplus.extension.context.Interaction;
+import com.nccgroup.collaboratorplusplus.extension.exception.*;
 import com.nccgroup.collaboratorplusplus.utilities.Encryption;
 import org.apache.http.*;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.config.SocketConfig;
 import org.apache.http.conn.ssl.DefaultHostnameVerifier;
 import org.apache.http.conn.ssl.NoopHostnameVerifier;
 import org.apache.http.conn.ssl.TrustAllStrategy;
@@ -28,7 +32,6 @@ import org.apache.http.util.EntityUtils;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLHandshakeException;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.*;
 import java.security.*;
@@ -52,12 +55,11 @@ public class ProxyService implements HttpRequestHandler {
     private String sessionKey;
     private HttpServer server;
     private URI forwardingURI;
-    private boolean serverStarted;
 
     ProxyService(CollaboratorContextManager collaboratorContextManager, ArrayList<IProxyServiceListener> listeners,
-                    String collaboratorAddress, Integer listenPort, URI forwardingURI, boolean useAuthentication,
-                    String secret, boolean ignoreCertificateErrors, boolean hostnameVerification,
-                    HttpHost proxyAddress){
+                 String collaboratorAddress, Integer listenPort, URI forwardingURI, boolean useAuthentication,
+                 String secret, boolean ignoreCertificateErrors, boolean hostnameVerification,
+                 HttpHost proxyAddress){
         this.serviceListeners = listeners;
         this.contextManager = collaboratorContextManager;
         this.collaboratorAddress = collaboratorAddress;
@@ -79,6 +81,7 @@ public class ProxyService implements HttpRequestHandler {
                 .setConnectionReuseStrategy(new NoConnectionReuseStrategy())
                 .setLocalAddress(Inet4Address.getLoopbackAddress())
                 .setListenerPort(listenPort)
+                .setSocketConfig(SocketConfig.custom().setSoReuseAddress(true).build())
                 .registerHandler("*", this);
 
         serverBootstrap.setExceptionLogger(ex -> {
@@ -98,17 +101,15 @@ public class ProxyService implements HttpRequestHandler {
             requestInteractionsForContext("test");
             handleStartupSuccess("Server Started.");
         }catch (Exception e){
-            e.printStackTrace();
-            handleFailure(e.getMessage());
+            handleStartupFailure(e.getMessage());
         }
 
         //Server is started...
-        this.serverStarted = true;
     }
 
     public void stop(){
         if(server != null){
-            server.shutdown(10, TimeUnit.MICROSECONDS);
+            server.shutdown(500, TimeUnit.MILLISECONDS);
             server = null;
         }
     }
@@ -142,190 +143,183 @@ public class ProxyService implements HttpRequestHandler {
         return context;
     }
 
-    private CloseableHttpClient buildHttpClient() throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
+    private CloseableHttpClient buildHttpClient() throws CollaboratorPollingException {
         CloseableHttpClient client;
         try {
             client = buildHttpClient(this.ignoreCertificateErrors, this.hostnameVerification, this.proxyAddress);
         } catch (NoSuchAlgorithmException | KeyStoreException | KeyManagementException e) {
-            logManager.logDebug("Could not create HTTP client, " + e.getMessage());
-            logManager.logError(e);
-            throw e;
+            logManager.logError("Could not create HTTP client, " + e.getMessage());
+            logManager.logDebug(e);
+            throw new CollaboratorPollingException(e.getMessage());
         }
         logManager.logDebug("HTTP Client Created: " + client);
         return client;
     }
 
-    public HttpResponse requestInteractionsForContext(String contextIdentifier) throws Exception {
-        return requestInteractionsForContext(buildHttpClient(), contextIdentifier);
+    public ArrayList<Interaction> requestInteractionsForContext(String contextIdentifier) throws CollaboratorPollingException {
+        CloseableHttpClient client = buildHttpClient();
+        try {
+            return requestInteractionsForContext(client, contextIdentifier).getInteractions();
+        }catch (CollaboratorPollingException e){
+            this.contextManager.pollingFailure(e.getMessage());
+            throw e;
+        } finally {
+            if (client != null) {
+                try {
+                    client.close();
+                } catch (IOException ignored) {}
+            }
+        }
     }
 
-    private HttpResponse requestInteractionsForContext(CloseableHttpClient httpClient, String contextIdentifier) throws Exception {
+    private CollaboratorServerResponse requestInteractionsForContext(CloseableHttpClient httpClient, String contextIdentifier) throws CollaboratorPollingException {
 
         //Build request to collaborator server
         HttpHost host = new HttpHost(forwardingURI.getHost(), forwardingURI.getPort(), forwardingURI.getScheme());
         HttpRequest clientRequest;
-        String pollingRequestUri = "/burpresults?biid=" + URLEncoder.encode(contextIdentifier, "UTF-8");
+        String pollingRequestUri = "/burpresults?biid=" + URLEncoder.encode(contextIdentifier);
         logManager.logInfo("Requesting interactions from server for identifier: " + contextIdentifier);
 
 
         String responseString = null;
         HttpResponse collaboratorServerResponse = null;
         try {
+            if (useAuthentication) { //If we're using authentication, send an encrypted POST
+                clientRequest = new HttpPost("/");
+                buildAuthenticatedRequest((HttpPost) clientRequest, pollingRequestUri);
+            } else { //Otherwise do a basic GET.
+                clientRequest = new HttpGet(pollingRequestUri);
+            }
+
+            clientRequest.addHeader("Connection", "close");
+
+            //Don't process the context if we're testing connection
+            if (!contextIdentifier.equalsIgnoreCase("test"))
+                this.contextManager.pollingRequestSent(this.collaboratorAddress, contextIdentifier);
+
+            //Make the request
+            logManager.logDebug("Sending Request.. " + clientRequest);
+            collaboratorServerResponse = httpClient.execute(host, clientRequest);
+            final int statusCode = collaboratorServerResponse.getStatusLine().getStatusCode();
+            boolean isAuthServer = collaboratorServerResponse.getFirstHeader("X-Auth-Compatible") != null;
+            logManager.logDebug("Received response: Status " + statusCode + ", " + collaboratorServerResponse.getEntity());
+
+            if (collaboratorServerResponse.getFirstHeader("X-Collaborator-Version") == null) {
+                logManager.logDebug("Server Response: " + EntityUtils.toString(collaboratorServerResponse.getEntity()));
+                throw new InvalidResponseException("Not a valid collaborator response! Are we definitely targeting a Collaborator server?");
+            }
+
+
+            if (isAuthServer ^ useAuthentication) {
+                //If auth server and not using auth
+                // or trying to use auth on a standard collaborator instance
+                responseString = (useAuthentication
+                        ? "Authentication was enabled but was not supported by the Collaborator instance." :
+                        "The targeted Collaborator instance requires authentication.");
+                throw new AuthenticationException(responseString);
+            } else {
+                if (!useAuthentication || statusCode == HttpStatus.SC_UNAUTHORIZED) {
+                    // Either we're not targeting the authentication server or
+                    // the server could not decrypt our request. Secret is probably incorrect!
+                    logManager.logDebug("Plaintext Response Received: " + responseString);
+                    responseString = EntityUtils.toString(collaboratorServerResponse.getEntity());
+                    throw new InvalidSecretException(responseString);
+                } else {
+                    //The response should have been encrypted.
+                    byte[] responseBytes = EntityUtils.toByteArray(collaboratorServerResponse.getEntity());
+
+                    if (new String(responseBytes).startsWith("<html>") && this.proxyAddress != null) {
+                        //No response from the server, burp responded with its own message!
+                        //Likely due to protocol mismatch.
+                        throw new InvalidResponseException("Communication with the authentication server failed. " +
+                                "It was not possible to determine why due to Burp providing its own response. " +
+                                "Try again without proxying the requests through Burp.");
+                    }
+
+                    responseString = Encryption.aesDecryptRequest(this.sessionKey, responseBytes);
+                    logManager.logDebug("Decrypted Response: " + responseString);
+                }
+
+                if (statusCode == HttpStatus.SC_OK) {
+                    JsonObject interactionsJson = JsonParser.parseString(responseString).getAsJsonObject();
+                    ArrayList<Interaction> interactions = Utilities.parseInteractions(interactionsJson);
+                    logManager.logInfo(String.format("%d interaction%s retrieved.", interactions.size(),
+                            interactions.size() > 0 ? "s" : ""));
+
+                    if (!contextIdentifier.equalsIgnoreCase("test")) {
+                        this.contextManager.addInteractions(this.collaboratorAddress,  contextIdentifier, interactions);
+                    }
+
+                    return new CollaboratorServerResponse(collaboratorServerResponse, interactions);
+                }else{
+                    throw new InvalidResponseException("The Collaborator server responded with an error code which was not 200 OK.");
+                }
+            }
+        } catch (ClientProtocolException | SSLHandshakeException e) {
+            //Make the invalid certificate error a bit more friendly!
+            if (e.getMessage() != null && e.getMessage().contains("unable to find valid certification path to requested target")) {
+                responseString = "The SSL certificate provided by the server could not be verified. " +
+                        "To override this, check the \"Ignore Certificate Errors\" option but proceed with caution!";
+            } else {
+                responseString = e.getMessage() != null
+                        ? e.getMessage()
+                        : "SSL exception. Check you're targetting the correct protocol and the server is configured correctly.";
+            }
+            logManager.logDebug(e);
+            throw new CollaboratorSSLException(responseString);
+        }catch (GeneralSecurityException | IOException e) {
+            logManager.logDebug(e);
+            throw new CollaboratorPollingException(e.getMessage());
+        } catch (CollaboratorPollingException e){
+            logManager.logDebug(e);
+            throw e;
+        }
+    }
+
+    @Override
+    public void handle(HttpRequest request, HttpResponse forwardedResponse, HttpContext context) throws IOException {
+
+        String responseString = "";
+        try {
+            CloseableHttpClient httpClient = buildHttpClient();
+            String contextId = URLDecoder.decode(request.getRequestLine().getUri().substring("/burpresults?biid=".length()), "UTF-8");
+
+            CollaboratorServerResponse collaboratorResponse;
             try {
-                if (useAuthentication) { //If we're using authentication, send an encrypted POST
-                    clientRequest = new HttpPost("/");
-                    buildAuthenticatedRequest((HttpPost) clientRequest, pollingRequestUri);
-                } else { //Otherwise do a basic GET.
-                    clientRequest = new HttpGet(pollingRequestUri);
-                }
-
-                clientRequest.addHeader("Connection", "close");
-
-                //Don't process the context if we're testing connection
-                if (!contextIdentifier.equalsIgnoreCase("test"))
-                    this.contextManager.pollingRequestSent(this.collaboratorAddress, contextIdentifier);
-
-                //Make the request
-                logManager.logDebug("Sending Request.. " + clientRequest);
-                collaboratorServerResponse = httpClient.execute(host, clientRequest);
-                final int statusCode = collaboratorServerResponse.getStatusLine().getStatusCode();
-                boolean isAuthServer = collaboratorServerResponse.getFirstHeader("X-Auth-Compatible") != null;
-                logManager.logDebug("Received response: Status " + statusCode + ", " + collaboratorServerResponse.getEntity());
-
-                if (collaboratorServerResponse.getFirstHeader("X-Collaborator-Version") == null) {
-                    logManager.logDebug("Server Response: " + EntityUtils.toString(collaboratorServerResponse.getEntity()));
-                    throw new Exception("Not a valid collaborator response! Are we definitely targeting a Collaborator server?");
-                }
-
-
-                if (isAuthServer ^ useAuthentication) {
-                    //If auth server and not using auth
-                    // or trying to use auth on a standard collaborator instance
-                    collaboratorServerResponse.setStatusCode(HttpStatus.SC_BAD_REQUEST);
-                    responseString = (useAuthentication
-                            ? "Authentication was enabled but was not supported by the Collaborator instance." :
-                            "The targeted Collaborator instance requires authentication.");
-                } else {
-                    if (!useAuthentication || statusCode == HttpStatus.SC_UNAUTHORIZED) {
-                        // Either we're not targeting the authentication server or
-                        // the server could not decrypt our request. Secret is probably incorrect!
-                        responseString = EntityUtils.toString(collaboratorServerResponse.getEntity());
-                        logManager.logDebug("Plaintext Response Received: " + responseString);
-                    } else {
-                        //The response should have been encrypted.
-                        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-                        collaboratorServerResponse.getEntity().writeTo(outputStream);
-                        byte[] responseBytes = outputStream.toByteArray();
-
-                        if (new String(responseBytes).startsWith("<html>") && this.proxyAddress != null) {
-                            //No response from the server, burp responded with its own message!
-                            //Likely due to protocol mismatch.
-                            throw new Exception("Communication with the authentication server failed and it was not " +
-                                    "possible to determine why due to Burp providing its own response. " +
-                                    "Try again without proxying the requests through Burp.");
-                        }
-
-                        responseString = Encryption.aesDecryptRequest(this.sessionKey, responseBytes);
-                        logManager.logDebug("Decrypted Response: " + responseString);
-                    }
-
-                    if (statusCode == HttpStatus.SC_OK) {
-                        JsonObject responseJson = JsonParser.parseString(responseString).getAsJsonObject();
-                        int interactions = responseJson.has("responses")
-                                ? responseJson.getAsJsonArray("responses").size()
-                                : 0;
-                        logManager.logInfo(interactions +
-                                (interactions == 1 ? " interaction" : " interactions") + " retrieved.");
-                        if (interactions != 0) {
-                            if (!contextIdentifier.equalsIgnoreCase("test")) {
-                                this.contextManager.interactionEventsReceived(this.collaboratorAddress,  contextIdentifier,
-                                        responseJson.getAsJsonArray("responses"));
-                            }
-                        }
-                    }
-                }
-            } catch (ClientProtocolException | SSLHandshakeException e) {
-                //Make the invalid certificate error a bit more friendly!
-                if (e.getMessage() != null && e.getMessage().contains("unable to find valid certification path to requested target")) {
-                    responseString = "The SSL certificate provided by the server could not be verified. " +
-                            "To override this, check the \"Ignore Certificate Errors\" option but proceed with caution!";
-                } else {
-                    responseString = e.getMessage() != null
-                            ? e.getMessage()
-                            : "SSL exception. Check you're targetting the correct protocol and the server is configured correctly.";
-                }
-            } finally {
+                collaboratorResponse = requestInteractionsForContext(httpClient, contextId);
+            }finally {
                 if (httpClient != null) {
                     try {
                         httpClient.close();
                     } catch (IOException ignored) {}
                 }
             }
-        }catch (Exception e){
-            logManager.logDebug(e);
-            throw e;
-        }
 
-        if(collaboratorServerResponse != null) {
-            collaboratorServerResponse.setEntity(new StringEntity(responseString));
-            return collaboratorServerResponse;
-        }else{
-            throw new Exception(responseString);
-        }
-    }
-
-    @Override
-    public void handle(HttpRequest request, HttpResponse forwardedResponse, HttpContext context) throws IOException {
-        CloseableHttpClient httpClient;
-
-        try{
-            httpClient = buildHttpClient();
-        }catch (Exception e){
-            handleFailure("Could not build the HTTP client. Unable to poll the Collaborator Authenticator server.");
-            return;
-        }
-
-        String responseString = "";
-        String contextId = URLDecoder.decode(request.getRequestLine().getUri().substring("/burpresults?biid=".length()), "UTF-8");
-
-        try {
-            HttpResponse collaboratorResponse = requestInteractionsForContext(httpClient, contextId);
-            if (collaboratorResponse != null) {
-                int statusCode = collaboratorResponse.getStatusLine().getStatusCode();
-                responseString = EntityUtils.toString(collaboratorResponse.getEntity());
-
-                if (statusCode == HttpStatus.SC_OK) {
-                    //Must forward collaborator headers to the client too!
-                    for (Header header : collaboratorResponse.getAllHeaders()) {
-                        if (header.getName().startsWith("X-Collaborator")) {
-                            forwardedResponse.addHeader(header);
-                        }
-                    }
-
-                    StringEntity forwardedResponseEntity = new StringEntity(responseString);
-                    forwardedResponseEntity.setContentType("application/json");
-                    forwardedResponse.setStatusCode(HttpStatus.SC_OK);
-                    forwardedResponse.setEntity(forwardedResponseEntity);
-
-                    handleStartupSuccess(responseString);
-                    return;
-
-                } else if (statusCode == HttpStatus.SC_UNAUTHORIZED) {
-                    responseString = "The provided secret is incorrect";
-                } else {
-                    responseString = "The server could not process the request: " + responseString;
+            //Must forward collaborator headers to the client too!
+            for (Header header : collaboratorResponse.getHttpResponse().getAllHeaders()) {
+                if (header.getName().startsWith("X-Collaborator")) {
+                    forwardedResponse.addHeader(header);
                 }
-            } else {
-                responseString = "Could not communicate with the Collaborator server. " +
-                        "Set the log level to debug and try again for more information.";
             }
+
+            JsonObject interactions =
+                    Utilities.convertInteractionsToCollaboratorResponse(collaboratorResponse.getInteractions());
+            StringEntity forwardedResponseEntity = new StringEntity(new Gson().toJson(interactions));
+            forwardedResponseEntity.setContentType("application/json");
+            forwardedResponse.setStatusCode(HttpStatus.SC_OK);
+            forwardedResponse.setEntity(forwardedResponseEntity);
+
+            return;
         }catch (Exception e){
-            e.printStackTrace();
+            logManager.logError(e.getMessage());
+            logManager.logDebug(e);
             responseString = e.getMessage();
         }
 
-        logManager.logError(responseString);
-        handleFailure(responseString);
+        this.contextManager.pollingFailure(responseString);
+
+        forwardedResponse.setStatusCode(500);
+        logManager.logInfo("Could not retrieve interactions: " + responseString);
     }
 
     private void buildAuthenticatedRequest(HttpPost clientRequest, String pollingRequestUri) throws GeneralSecurityException {
@@ -344,7 +338,7 @@ public class ProxyService implements HttpRequestHandler {
         }
     }
 
-    private void handleFailure(String message){
+    private void handleStartupFailure(String message){
         for (IProxyServiceListener serviceListener : this.serviceListeners) {
             try{
                 serviceListener.onStartupFail(message);
