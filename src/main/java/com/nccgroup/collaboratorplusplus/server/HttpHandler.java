@@ -50,16 +50,7 @@ public class HttpHandler implements HttpRequestHandler {
         response.addHeader(new BasicHeader("X-Auth-Compatible", "true"));
 
         if (!(request instanceof BasicHttpEntityEnclosingRequest)) {
-            response.setEntity(new StringEntity("<h1>Collaborator Authenticator</h1>" +
-                    "Collaborator Authenticator is a tool designed to provide an authentication mechanism to the " +
-                    "Burp Collaborator service, a tool provided as part of the Burp Suite application.<br/>" +
-                    "<br/>" +
-                    "Collaborator Authenticator is an Open Source project and is released under the AGPL-v3.0 licence.<br/>" +
-                    "<a href=\"https://github.com/NCCGroup/CollaboratorPlusPlus\">View the project on GitHub</a>" +
-                    "<br/><br/>" +
-                    "<h2>Burp Suite</h2>" +
-                    "<a href=\"https://portswigger.net/burp/\">Burp Suite</a> is a web testing application " +
-                    "developed by PortSwigger.<br/>", ContentType.TEXT_HTML));
+            response.setEntity(new StringEntity(Utilities.getAboutPage(), ContentType.TEXT_HTML));
             response.setStatusCode(HttpStatus.SC_OK);
             return;
         }

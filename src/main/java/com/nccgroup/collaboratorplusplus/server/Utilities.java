@@ -41,4 +41,17 @@ public class Utilities {
         CertificateFactory certificateFactory = CertificateFactory.getInstance("X509");
         return certificateFactory.generateCertificate(new ByteArrayInputStream(pemContent));
     }
+
+    public static String getAboutPage(){
+        return "<h1>Collaborator++</h1>" +
+                "Collaborator++ is a project designed to provide an authentication mechanism to the " +
+                "Burp Collaborator service, a tool provided as part of the Burp Suite application.<br/>" +
+                "<br/>" +
+                "Collaborator Authenticator is an Open Source project and is released under the AGPL-v3.0 licence.<br/>" +
+                "<a href=\"https://github.com/NCCGroup/CollaboratorPlusPlus\">View the project on GitHub</a>" +
+                "<br/><br/>" +
+                "<h2>Burp Suite</h2>" +
+                "<a href=\"https://portswigger.net/burp/\">Burp Suite</a> is a web testing application " +
+                "developed by PortSwigger.<br/>";
+    }
 }

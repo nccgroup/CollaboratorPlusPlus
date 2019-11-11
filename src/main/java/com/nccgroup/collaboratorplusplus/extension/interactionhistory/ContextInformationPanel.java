@@ -4,19 +4,17 @@ import com.coreyd97.BurpExtenderUtilities.Alignment;
 import com.coreyd97.BurpExtenderUtilities.PanelBuilder;
 import com.coreyd97.BurpExtenderUtilities.Preferences;
 import com.nccgroup.collaboratorplusplus.extension.CollaboratorEventAdapter;
-import com.nccgroup.collaboratorplusplus.extension.context.CollaboratorContextManager;
+import com.nccgroup.collaboratorplusplus.extension.context.ContextManager;
 import com.nccgroup.collaboratorplusplus.extension.context.ContextInfo;
 import com.nccgroup.collaboratorplusplus.extension.context.Interaction;
 import com.nccgroup.collaboratorplusplus.utilities.SelectableLabel;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 
 class ContextInformationPanel extends JPanel {
 
-    private final CollaboratorContextManager contextManager;
+    private final ContextManager contextManager;
     private final Preferences preferences;
 
     ContextInfo selectedContext;
@@ -28,7 +26,7 @@ class ContextInformationPanel extends JPanel {
 
     InteractionsTable interactionsTable;
 
-    ContextInformationPanel(CollaboratorContextManager contextManager, Preferences preferences){
+    ContextInformationPanel(ContextManager contextManager, Preferences preferences){
         super(new BorderLayout());
         this.contextManager = contextManager;
         this.preferences = preferences;
@@ -63,22 +61,18 @@ class ContextInformationPanel extends JPanel {
             }
         });
 
-        try{
-            JLabel idTitle = new JLabel("ID: ");
-            JLabel lpTitle = new JLabel("Last Polled: ");
-            idTitle.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 30));
-            lpTitle.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 30));
-            return panelBuilder.build(new JComponent[][]{
-                    new JComponent[] {idTitle, identifierLabel, pollNowButton},
-                    new JComponent[] {lpTitle, lastPolledLabel, pollNowButton},
-            }, new int[][]{
-                    new int[]{0, 1, 0},
-                    new int[]{0, 1, 0},
-                    new int[]{0, 100, 0}
-            }, Alignment.CENTER, 1.0, 1.0);
-        }catch (Exception e){
-            return new JLabel("Could not build Context Information panel! :(");
-        }
+        JLabel idTitle = new JLabel("ID: ");
+        JLabel lpTitle = new JLabel("Last Polled: ");
+        idTitle.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 30));
+        lpTitle.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 30));
+        return panelBuilder.build(new JComponent[][]{
+                new JComponent[] {idTitle, identifierLabel, pollNowButton},
+                new JComponent[] {lpTitle, lastPolledLabel, pollNowButton},
+        }, new int[][]{
+                new int[]{0, 1, 0},
+                new int[]{0, 1, 0},
+                new int[]{0, 100, 0}
+        }, Alignment.CENTER, 1.0, 1.0);
     }
 
     void displayContext(ContextInfo contextInfo){
@@ -89,7 +83,7 @@ class ContextInformationPanel extends JPanel {
             this.lastPolledLabel.setText(contextInfo.getLastPolled().toString());
         }else{
             this.selectedContext = null;
-            this.interactionsTable.setContext(contextInfo);
+            this.interactionsTable.setContext(null);
             this.identifierLabel.setText("N/A");
             this.lastPolledLabel.setText("N/A");
         }
@@ -105,10 +99,13 @@ class ContextInformationPanel extends JPanel {
             interactionInformationPanel.setActiveInteraction(selectedInteraction);
         });
 
+        //Update last polled text when poll request sent
         this.contextManager.addEventListener(new CollaboratorEventAdapter() {
             @Override
-            public void onPollingRequestSent(String biid, boolean isFirstPoll) {
-                if(selectedContext != null && biid.equalsIgnoreCase(selectedContext.getIdentifier())){
+            public void onPollingRequestSent(String collaboratorServer, String contextIdentifier, boolean isFirstPoll) {
+                if(selectedContext != null
+                        && collaboratorServer.equalsIgnoreCase(selectedContext.getCollaboratorAddress())
+                        && contextIdentifier.equalsIgnoreCase(selectedContext.getIdentifier())){
                     lastPolledLabel.setText(selectedContext.getLastPolled().toString());
                     lastPolledLabel.setForeground(Color.ORANGE);
 

@@ -1,15 +1,14 @@
 package com.nccgroup.collaboratorplusplus.extension.interactionhistory;
 
 import com.nccgroup.collaboratorplusplus.extension.CollaboratorEventAdapter;
-import com.nccgroup.collaboratorplusplus.extension.context.CollaboratorContextManager;
 import com.nccgroup.collaboratorplusplus.extension.CollaboratorPlusPlus;
 import com.nccgroup.collaboratorplusplus.extension.context.ContextInfo;
+import com.nccgroup.collaboratorplusplus.extension.context.ContextManager;
 import com.nccgroup.collaboratorplusplus.extension.context.Interaction;
 
 import javax.swing.*;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.TableCellRenderer;
-
 import java.awt.*;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -18,10 +17,10 @@ import java.util.UUID;
 public class InteractionsTable extends JTable {
     static SimpleDateFormat DATE_FORMAT = new SimpleDateFormat();
 
-    private final CollaboratorContextManager contextManager;
+    private final ContextManager contextManager;
     ContextInfo contextInfo;
 
-    InteractionsTable(CollaboratorContextManager contextManager) {
+    InteractionsTable(ContextManager contextManager) {
         this.setModel(new InteractionsTableModel());
         this.setAutoCreateRowSorter(true);
         this.contextManager = contextManager;
@@ -39,10 +38,10 @@ public class InteractionsTable extends JTable {
     private void registerCollaboratorEventListeners() {
         this.contextManager.addEventListener(new CollaboratorEventAdapter() {
             @Override
-            public void onPollingResponseReceived(String biid, ArrayList<Interaction> interactions) {
+            public void onPollingResponseReceived(String collaboratorServer, String contextIdentifier, ArrayList<Interaction> interactions) {
                 SwingUtilities.invokeLater(() -> {
                     if (interactions.size() > 0 && InteractionsTable.this.contextInfo != null
-                            && InteractionsTable.this.contextInfo.getIdentifier().equalsIgnoreCase(biid)) {
+                            && InteractionsTable.this.contextInfo.getIdentifier().equalsIgnoreCase(contextIdentifier)) {
                         int initialSize = contextInfo.getInteractionEvents().size() - interactions.size();
 
                         try {

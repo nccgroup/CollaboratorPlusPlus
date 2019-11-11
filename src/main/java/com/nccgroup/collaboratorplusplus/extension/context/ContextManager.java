@@ -1,49 +1,44 @@
 package com.nccgroup.collaboratorplusplus.extension.context;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import com.nccgroup.collaboratorplusplus.extension.CollaboratorEventListener;
 import com.nccgroup.collaboratorplusplus.extension.CollaboratorPlusPlus;
 import com.nccgroup.collaboratorplusplus.extension.Globals;
-import com.nccgroup.collaboratorplusplus.extension.Utilities;
-import org.apache.http.HttpResponse;
-import org.apache.http.HttpStatus;
-import org.apache.http.util.EntityUtils;
 
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 
-public class CollaboratorContextManager {
+public class ContextManager {
 
     private final CollaboratorPlusPlus extension;
     private ArrayList<String> identifiers;
     private HashMap<String, ContextInfo> collaboratorHistory;
     private final ArrayList<CollaboratorEventListener> eventListeners;
 
-    public CollaboratorContextManager(CollaboratorPlusPlus extension){
+    public ContextManager(CollaboratorPlusPlus extension){
         this.extension = extension;
         this.identifiers = new ArrayList<>();
         this.eventListeners = new ArrayList<>();
         loadCollaboratorContextHistory();
     }
 
-    public void pollingRequestSent(String collaboratorAddress, String identifier){
-        boolean isFirstPoll = !this.collaboratorHistory.containsKey(identifier);
+    public void pollingRequestSent(String collaboratorAddress, String contextIdentifier){
+        String completeIdentifier = getCompleteIdentifier(collaboratorAddress, contextIdentifier);
+
+        boolean isFirstPoll = !this.collaboratorHistory.containsKey(completeIdentifier);
         if(isFirstPoll){
-            this.collaboratorHistory.put(identifier, new ContextInfo(collaboratorAddress, identifier));
-            this.identifiers.add(identifier);
+            this.collaboratorHistory.put(completeIdentifier, new ContextInfo(collaboratorAddress, contextIdentifier));
+            this.identifiers.add(completeIdentifier);
         }else{
-            this.collaboratorHistory.get(identifier).lastPolled = new Date();
+            this.collaboratorHistory.get(completeIdentifier).lastPolled = new Date();
         }
 
         saveState();
 
         for (CollaboratorEventListener eventListener : eventListeners) {
             try {
-                eventListener.onPollingRequestSent(identifier, isFirstPoll);
+                eventListener.onPollingRequestSent(collaboratorAddress, contextIdentifier, isFirstPoll);
             }catch (Exception ignored){
                 ignored.printStackTrace();
             }
@@ -51,30 +46,31 @@ public class CollaboratorContextManager {
     }
 
     public void addInteractions(String collaboratorAddress, String identifier, ArrayList<Interaction> interactions){
-        if(!this.collaboratorHistory.containsKey(identifier)){
-            this.collaboratorHistory.put(identifier, new ContextInfo(collaboratorAddress, identifier));
-            this.identifiers.add(identifier);
+        String completeIdentifier = getCompleteIdentifier(collaboratorAddress, identifier);
+        if(!this.collaboratorHistory.containsKey(completeIdentifier)){
+            this.collaboratorHistory.put(completeIdentifier, new ContextInfo(collaboratorAddress, identifier));
+            this.identifiers.add(completeIdentifier);
         }
 
         //Parse our interactions
-        ContextInfo contextInfo = this.collaboratorHistory.get(identifier);
+        ContextInfo contextInfo = this.collaboratorHistory.get(completeIdentifier);
         contextInfo.addInteractions(interactions);
 
         saveState();
 
         for (CollaboratorEventListener eventListener : eventListeners) {
             try {
-                eventListener.onPollingResponseReceived(identifier, interactions);
+                eventListener.onPollingResponseReceived(collaboratorAddress, identifier, interactions);
             }catch (Exception ignored){
                 ignored.printStackTrace();
             }
         }
     }
 
-    public void pollingFailure(String message){
+    public void pollingFailure(String collaboratorAddress, String identifier, String message){
         for (CollaboratorEventListener eventListener : eventListeners) {
             try {
-                eventListener.onPollingFailure(message);
+                eventListener.onPollingFailure(collaboratorAddress, identifier, message);
             }catch (Exception ignored){
                 ignored.printStackTrace();
             }
@@ -124,6 +120,10 @@ public class CollaboratorContextManager {
     public void setHighlight(ContextInfo contextInfo, Color color){
         contextInfo.highlight = color;
         saveState();
+    }
+
+    private static String getCompleteIdentifier(String collaboratorAddress, String identifier){
+        return String.format("%s.%s", identifier, collaboratorAddress);
     }
 
 }

@@ -1,19 +1,19 @@
 package com.nccgroup.collaboratorplusplus.extension.interactionhistory;
 
 import com.coreyd97.BurpExtenderUtilities.Preferences;
-import com.nccgroup.collaboratorplusplus.extension.context.CollaboratorContextManager;
+import com.nccgroup.collaboratorplusplus.extension.context.ContextManager;
 
 import javax.swing.*;
 import java.awt.*;
 
 public class HistoryUI extends JSplitPane {
 
-    private final CollaboratorContextManager contextManager;
+    private final ContextManager contextManager;
     private final Preferences preferences;
     private ContextTable contextTable;
     private ContextInformationPanel contextInformationPanel;
 
-    public HistoryUI(CollaboratorContextManager contextManager, Preferences preferences){
+    public HistoryUI(ContextManager contextManager, Preferences preferences){
         super(VERTICAL_SPLIT);
         this.contextManager = contextManager;
         this.preferences = preferences;

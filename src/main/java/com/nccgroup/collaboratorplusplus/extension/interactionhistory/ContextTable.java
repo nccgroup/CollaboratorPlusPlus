@@ -1,7 +1,7 @@
 package com.nccgroup.collaboratorplusplus.extension.interactionhistory;
 
 import com.nccgroup.collaboratorplusplus.extension.CollaboratorEventAdapter;
-import com.nccgroup.collaboratorplusplus.extension.context.CollaboratorContextManager;
+import com.nccgroup.collaboratorplusplus.extension.context.ContextManager;
 import com.nccgroup.collaboratorplusplus.extension.CollaboratorPlusPlus;
 import com.nccgroup.collaboratorplusplus.extension.context.ContextInfo;
 import com.nccgroup.collaboratorplusplus.extension.context.Interaction;
@@ -16,15 +16,15 @@ import java.util.HashMap;
 
 class ContextTable extends JTable {
 
-    CollaboratorContextManager contextManager;
+    ContextManager contextManager;
     HashMap<String, ContextInfo> infoMap;
 
-    ContextTable(CollaboratorContextManager contextManager) {
+    ContextTable(ContextManager contextManager) {
         this.contextManager = contextManager;
         this.infoMap = contextManager.getCollaboratorContexts();
         this.setModel(new ContextTableTableModel());
         this.setAutoResizeMode(AUTO_RESIZE_ALL_COLUMNS);
-        for (int i = 2; i < 6; i++) {
+        for (int i = 3; i < 9; i++) {
             this.getColumnModel().getColumn(i).setMinWidth(100);
             this.getColumnModel().getColumn(i).setMaxWidth(100);
         }
@@ -44,8 +44,8 @@ class ContextTable extends JTable {
     private void registerCollaboratorEventListeners() {
         this.contextManager.addEventListener(new CollaboratorEventAdapter() {
             @Override
-            public void onPollingRequestSent(String biid, boolean isFirstPoll) {
-                int rowIndex = contextManager.getIdentifiers().indexOf(biid);
+            public void onPollingRequestSent(String collaboratorServer, String contextIdentifier, boolean isFirstPoll) {
+                int rowIndex = contextManager.getIdentifiers().indexOf(contextIdentifier);
                 try {
                     if (isFirstPoll) {
                         ((AbstractTableModel) ContextTable.this.getModel()).fireTableRowsInserted(rowIndex, rowIndex);
@@ -61,8 +61,8 @@ class ContextTable extends JTable {
             }
 
             @Override
-            public void onPollingResponseReceived(String biid, ArrayList<Interaction> interactions) {
-                int rowIndex = contextManager.getIdentifiers().indexOf(biid);
+            public void onPollingResponseReceived(String collaboratorServer, String contextIdentifier, ArrayList<Interaction> interactions) {
+                int rowIndex = contextManager.getIdentifiers().indexOf(contextIdentifier);
                 try {
                     ((AbstractTableModel) ContextTable.this.getModel()).fireTableRowsUpdated(rowIndex, rowIndex);
                 } catch (Exception e) {
@@ -80,7 +80,7 @@ class ContextTable extends JTable {
             public void mouseReleased(MouseEvent e) {
                 if (SwingUtilities.isRightMouseButton(e)) {
                     ContextTable table = ContextTable.this;
-                    CollaboratorContextManager contextManager = table.contextManager;
+                    ContextManager contextManager = table.contextManager;
 
                     int row = table.rowAtPoint(e.getPoint());
                     table.getSelectionModel().setSelectionInterval(row, row);
@@ -121,25 +121,26 @@ class ContextTable extends JTable {
 
         @Override
         public int getColumnCount() {
-            return 8;
+            return 9;
         }
 
         @Override
         public Class<?> getColumnClass(int columnIndex) {
-            return columnIndex > 2 ? Boolean.class : String.class;
+            return columnIndex > 3 ? Boolean.class : String.class;
         }
 
         @Override
         public String getColumnName(int column) {
             switch (column) {
                 case 0: return "Context Identifier";
-                case 1: return "Last Polled";
-                case 2: return "Interactions";
-                case 3: return "DNS";
-                case 4: return "HTTP";
-                case 5: return "HTTPS";
-                case 6: return "SMTP";
-                case 7: return "SMTPS";
+                case 1: return "Server";
+                case 2: return "Last Polled";
+                case 3: return "Interactions";
+                case 4: return "DNS";
+                case 5: return "HTTP";
+                case 6: return "HTTPS";
+                case 7: return "SMTP";
+                case 8: return "SMTPS";
             }
             return null;
         }
@@ -148,17 +149,18 @@ class ContextTable extends JTable {
         public Object getValueAt(int rowIndex, int columnIndex) {
             if (rowIndex >= contextManager.getIdentifiers().size()) return null;
             String identifier = contextManager.getIdentifiers().get(rowIndex);
-            if (columnIndex == 0) return identifier;
             ContextInfo contextInfo = contextManager.getCollaboratorContext(identifier);
             if(contextInfo == null) return null;
             switch (columnIndex) {
-                case 1: return contextInfo.getLastPolled();
-                case 2: return contextInfo.getInteractionEvents().size();
-                case 3: return contextInfo.hasDNSEvent();
-                case 4: return contextInfo.hasHTTPEvent();
-                case 5: return contextInfo.hasHTTPSEvent();
-                case 6: return contextInfo.hasSMTPEvent();
-                case 7: return contextInfo.hasSMTPSEvent();
+                case 0: return contextInfo.getIdentifier();
+                case 1: return contextInfo.getCollaboratorAddress();
+                case 2: return contextInfo.getLastPolled();
+                case 3: return contextInfo.getInteractionEvents().size();
+                case 4: return contextInfo.hasDNSEvent();
+                case 5: return contextInfo.hasHTTPEvent();
+                case 6: return contextInfo.hasHTTPSEvent();
+                case 7: return contextInfo.hasSMTPEvent();
+                case 8: return contextInfo.hasSMTPSEvent();
             }
             return null;
         }

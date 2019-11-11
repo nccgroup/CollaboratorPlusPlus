@@ -3,7 +3,7 @@ package com.nccgroup.collaboratorplusplus.extension;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.nccgroup.collaboratorplusplus.extension.context.CollaboratorContextManager;
+import com.nccgroup.collaboratorplusplus.extension.context.ContextManager;
 import com.nccgroup.collaboratorplusplus.extension.context.Interaction;
 import com.nccgroup.collaboratorplusplus.extension.exception.*;
 import com.nccgroup.collaboratorplusplus.utilities.Encryption;
@@ -43,7 +43,7 @@ import static com.nccgroup.collaboratorplusplus.extension.CollaboratorPlusPlus.l
 
 public class ProxyService implements HttpRequestHandler {
 
-    private final CollaboratorContextManager contextManager;
+    private final ContextManager contextManager;
     private final String collaboratorAddress;
     private final int listenPort;
     private final boolean useAuthentication;
@@ -56,12 +56,12 @@ public class ProxyService implements HttpRequestHandler {
     private HttpServer server;
     private URI forwardingURI;
 
-    ProxyService(CollaboratorContextManager collaboratorContextManager, ArrayList<IProxyServiceListener> listeners,
+    ProxyService(ContextManager contextManager, ArrayList<IProxyServiceListener> listeners,
                  String collaboratorAddress, Integer listenPort, URI forwardingURI, boolean useAuthentication,
                  String secret, boolean ignoreCertificateErrors, boolean hostnameVerification,
                  HttpHost proxyAddress){
         this.serviceListeners = listeners;
-        this.contextManager = collaboratorContextManager;
+        this.contextManager = contextManager;
         this.collaboratorAddress = collaboratorAddress;
         this.listenPort = listenPort;
         this.ignoreCertificateErrors = ignoreCertificateErrors;
@@ -161,7 +161,7 @@ public class ProxyService implements HttpRequestHandler {
         try {
             return requestInteractionsForContext(client, contextIdentifier).getInteractions();
         }catch (CollaboratorPollingException e){
-            this.contextManager.pollingFailure(e.getMessage());
+            this.contextManager.pollingFailure(collaboratorAddress, contextIdentifier, e.getMessage());
             throw e;
         } finally {
             if (client != null) {
@@ -277,16 +277,17 @@ public class ProxyService implements HttpRequestHandler {
     }
 
     @Override
-    public void handle(HttpRequest request, HttpResponse forwardedResponse, HttpContext context) throws IOException {
+    public void handle(HttpRequest request, HttpResponse forwardedResponse, HttpContext context) {
 
         String responseString = "";
+        String contextIdentifier = "";
         try {
             CloseableHttpClient httpClient = buildHttpClient();
-            String contextId = URLDecoder.decode(request.getRequestLine().getUri().substring("/burpresults?biid=".length()), "UTF-8");
+            contextIdentifier = URLDecoder.decode(request.getRequestLine().getUri().substring("/burpresults?biid=".length()), "UTF-8");
 
             CollaboratorServerResponse collaboratorResponse;
             try {
-                collaboratorResponse = requestInteractionsForContext(httpClient, contextId);
+                collaboratorResponse = requestInteractionsForContext(httpClient, contextIdentifier);
             }finally {
                 if (httpClient != null) {
                     try {
@@ -316,7 +317,7 @@ public class ProxyService implements HttpRequestHandler {
             responseString = e.getMessage();
         }
 
-        this.contextManager.pollingFailure(responseString);
+        this.contextManager.pollingFailure(collaboratorAddress, contextIdentifier, responseString);
 
         forwardedResponse.setStatusCode(500);
         logManager.logInfo("Could not retrieve interactions: " + responseString);

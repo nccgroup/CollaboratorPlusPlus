@@ -5,7 +5,7 @@ import burp.IBurpExtenderCallbacks;
 import burp.IExtensionStateListener;
 import com.coreyd97.BurpExtenderUtilities.DefaultGsonProvider;
 import com.coreyd97.BurpExtenderUtilities.Preferences;
-import com.nccgroup.collaboratorplusplus.extension.context.CollaboratorContextManager;
+import com.nccgroup.collaboratorplusplus.extension.context.ContextManager;
 import com.nccgroup.collaboratorplusplus.extension.context.Interaction;
 import com.nccgroup.collaboratorplusplus.extension.ui.ExtensionUI;
 import com.nccgroup.collaboratorplusplus.utilities.LogManager;
@@ -27,7 +27,7 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
     public static IBurpExtenderCallbacks callbacks;
     public static LogManager logManager;
     private ProxyService proxyService;
-    private CollaboratorContextManager collaboratorContextManager;
+    private ContextManager contextManager;
     private Preferences preferences;
     private ArrayList<IProxyServiceListener> proxyServiceListeners;
 
@@ -58,7 +58,7 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
         //Setup preferences
         DefaultGsonProvider gsonProvider = new DefaultGsonProvider();
         this.preferences = new CollaboratorPreferenceFactory(gsonProvider, callbacks).buildPreferences();
-        this.collaboratorContextManager = new CollaboratorContextManager(this);
+        this.contextManager = new ContextManager(this);
         logManager.setLogLevel(this.preferences.getSetting(PREF_LOG_LEVEL));
 
         //Clean up proxy service on startup failure and color tab when running/stopped
@@ -82,14 +82,14 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
         });
 
         //Color tab orange if errors, green if working correctly.
-        this.collaboratorContextManager.addEventListener(new CollaboratorEventAdapter() {
+        this.contextManager.addEventListener(new CollaboratorEventAdapter() {
             @Override
-            public void onPollingResponseReceived(String biid, ArrayList<Interaction> interactions) {
+            public void onPollingResponseReceived(String collaboratorServer, String contextIdentifier, ArrayList<Interaction> interactions) {
                 burpTabController.setTabColor(Color.GREEN);
             }
 
             @Override
-            public void onPollingFailure(String error) {
+            public void onPollingFailure(String collaboratorServer, String contextIdentifier, String error) {
                 burpTabController.setTabColor(Color.ORANGE);
             }
         });
@@ -163,7 +163,7 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
         callbacks.loadConfigFromJson(Utilities.buildPollingRedirectionConfig(preferences, listenPort));
 
         //Build the proxy service with the required values.
-        proxyService = new ProxyService(collaboratorContextManager, proxyServiceListeners,
+        proxyService = new ProxyService(contextManager, proxyServiceListeners,
                 collaboratorAddress, listenPort, pollingAddress,
                 useAuthentication, secret, ignoreCertificateErrors, verifyHostname, proxy);
 
@@ -257,7 +257,7 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
         return logManager;
     }
 
-    public CollaboratorContextManager getContextManager() {
-        return this.collaboratorContextManager;
+    public ContextManager getContextManager() {
+        return this.contextManager;
     }
 }
