@@ -3,7 +3,7 @@ plugins {
 }
 
 group 'nccgroup'
-version '0.2.1-Beta'
+version '0.3.0-Beta'
 sourceCompatibility = 1.8
 
 
