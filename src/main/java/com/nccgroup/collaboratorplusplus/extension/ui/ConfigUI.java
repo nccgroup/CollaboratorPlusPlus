@@ -3,22 +3,19 @@ package com.nccgroup.collaboratorplusplus.extension.ui;
 import com.coreyd97.BurpExtenderUtilities.Alignment;
 import com.coreyd97.BurpExtenderUtilities.ComponentGroup;
 import com.coreyd97.BurpExtenderUtilities.PanelBuilder;
-import com.nccgroup.collaboratorplusplus.extension.CollaboratorPlusPlus;
-import com.nccgroup.collaboratorplusplus.extension.LogListener;
-import com.nccgroup.collaboratorplusplus.extension.IProxyServiceListener;
-import com.nccgroup.collaboratorplusplus.extension.Utilities;
-import com.nccgroup.collaboratorplusplus.utilities.LogManager;
+import com.nccgroup.collaboratorplusplus.extension.*;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.Logger;
+import org.apache.logging.log4j.core.config.Configurator;
 
 import javax.swing.*;
-import javax.swing.border.TitledBorder;
-import javax.swing.text.DefaultCaret;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.io.IOException;
 import java.net.URISyntaxException;
 
-import static com.nccgroup.collaboratorplusplus.extension.CollaboratorPlusPlus.logManager;
 import static com.nccgroup.collaboratorplusplus.extension.Globals.*;
 
 public class ConfigUI extends JPanel implements LogListener, IProxyServiceListener {
@@ -39,11 +36,9 @@ public class ConfigUI extends JPanel implements LogListener, IProxyServiceListen
     private JLabel statusLabel;
     private JTextArea logArea;
 
-    private String logLevel;
-    private boolean serverStarting;
+    private final static org.apache.logging.log4j.Logger logger = LogManager.getLogger(ConfigUI.class);
 
     public ConfigUI(CollaboratorPlusPlus extension){
-        CollaboratorPlusPlus.logManager.addLogListener(this);
         this.setLayout(new BorderLayout());
         this.extension = extension;
         this.extension.addProxyServiceListener(this);
@@ -151,7 +146,7 @@ public class ConfigUI extends JPanel implements LogListener, IProxyServiceListen
         });
         authenticationPanel.addComponent(enableAuthentication);
 
-        ComponentGroup secretInputPanel = panelBuilder.createComponentGroup("Shared Secret");
+        ComponentGroup secretInputPanel = panelBuilder.createComponentGroup("Shared Authentication Secret");
         secretArea = panelBuilder.createPreferenceTextArea(PREF_SECRET);
         secretArea.setLineWrap(true);
         secretArea.setEnabled(extension.getPreferences().getSetting(PREF_USE_AUTHENTICATION));
@@ -171,25 +166,26 @@ public class ConfigUI extends JPanel implements LogListener, IProxyServiceListen
         logArea.setWrapStyleWord(true);
         logArea.setBorder(null);
         logArea.setEditable(false);
-        DefaultCaret caret = (DefaultCaret)logArea.getCaret();
-        caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
+        logArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, logArea.getFont().getSize()));
+        JTextAreaAppender.addLog4j2TextAreaAppender(logArea);
+
         JScrollPane logScrollPane = new JScrollPane(logArea);
         logScrollPane.setBorder(BorderFactory.createLineBorder(Color.ORANGE));
         logScrollPane.setBorder(null);
         logScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
         JPanel logLevelPanel = new JPanel(new GridLayout(1,2));
-        JComboBox logLevelSelector = new JComboBox(LogManager.LogLevel.values());
-        logLevelSelector.setSelectedItem(logManager.getLogLevel());
+        JComboBox<Level> logLevelSelector = new JComboBox<>(new Level[]{Level.INFO, Level.DEBUG});
+        logLevelSelector.setSelectedItem(LogManager.getRootLogger().getLevel());
         logLevelSelector.addActionListener(e -> {
-            logManager.setLogLevel((LogManager.LogLevel) logLevelSelector.getSelectedItem());
-            extension.getPreferences().setSetting(PREF_LOG_LEVEL, logLevelSelector.getSelectedItem());
+            Level selectedLevel = (Level) logLevelSelector.getSelectedItem();
+            extension.getPreferences().setSetting(PREF_LOG_LEVEL, selectedLevel);
+            Configurator.setRootLevel(selectedLevel);
         });
         logLevelPanel.add(new JLabel("Log Level: "));
         logLevelPanel.add(logLevelSelector);
         JButton clearButton = panelBuilder.createButton("Clear Logs", actionEvent -> {
             logArea.setText("");
         });
-//        clearButton.setMaximumSize(new Dimension(Integer.MAX_VALUE, 20));
 
         GridBagConstraints logPanelGbc = logGroup.generateNextConstraints();
         logPanelGbc.weighty = 0;
@@ -227,7 +223,6 @@ public class ConfigUI extends JPanel implements LogListener, IProxyServiceListen
         startStopButton.setText("Starting...");
         startStopButton.setEnabled(false);
         startStopButton.setSelected(true);
-        serverStarting = true;
 
         //Disable all other controls
         enableControls(false);
@@ -235,9 +230,6 @@ public class ConfigUI extends JPanel implements LogListener, IProxyServiceListen
 
     @Override
     public void onStartupFail(String message) {
-        logManager.logInfo("Failed to start the local authentication proxy, " + message);
-        serverStarting = false;
-
         startStopButton.setText("Start");
         startStopButton.setSelected(false);
         startStopButton.setEnabled(true);
@@ -250,8 +242,6 @@ public class ConfigUI extends JPanel implements LogListener, IProxyServiceListen
 
     @Override
     public void onStartupSuccess(String message) {
-        serverStarting = false;
-        logManager.logInfo("Local authentication proxy started!");
         startStopButton.setText("Stop");
         startStopButton.setSelected(true);
         statusLabel.setText("Status: Listening on port " + localPortSpinner.getValue());

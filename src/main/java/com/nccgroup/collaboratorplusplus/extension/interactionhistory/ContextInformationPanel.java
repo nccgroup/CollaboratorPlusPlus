@@ -5,7 +5,7 @@ import com.coreyd97.BurpExtenderUtilities.PanelBuilder;
 import com.coreyd97.BurpExtenderUtilities.Preferences;
 import com.nccgroup.collaboratorplusplus.extension.CollaboratorEventAdapter;
 import com.nccgroup.collaboratorplusplus.extension.context.ContextManager;
-import com.nccgroup.collaboratorplusplus.extension.context.ContextInfo;
+import com.nccgroup.collaboratorplusplus.extension.context.CollaboratorContext;
 import com.nccgroup.collaboratorplusplus.extension.context.Interaction;
 import com.nccgroup.collaboratorplusplus.utilities.SelectableLabel;
 
@@ -17,7 +17,7 @@ class ContextInformationPanel extends JPanel {
     private final ContextManager contextManager;
     private final Preferences preferences;
 
-    ContextInfo selectedContext;
+    CollaboratorContext selectedContext;
     JTextField identifierLabel;
     JLabel lastPolledLabel;
     InteractionInfoPanel interactionInformationPanel;
@@ -54,7 +54,7 @@ class ContextInformationPanel extends JPanel {
         pollNowButton.setEnabled(false);
         pollNowButton.addActionListener(e -> {
             try {
-                contextManager.requestInteractions(selectedContext.getIdentifier());
+                contextManager.requestInteractions(selectedContext);
             } catch (Exception e1) {
                 JOptionPane.showMessageDialog(this, "Could not retrieve interactions:\n"
                         + e1.getMessage(), "Polling Error", JOptionPane.ERROR_MESSAGE);
@@ -75,12 +75,12 @@ class ContextInformationPanel extends JPanel {
         }, Alignment.CENTER, 1.0, 1.0);
     }
 
-    void displayContext(ContextInfo contextInfo){
-        if(contextInfo != null) {
-            this.selectedContext = contextInfo;
-            this.interactionsTable.setContext(contextInfo);
-            this.identifierLabel.setText(contextInfo.getIdentifier());
-            this.lastPolledLabel.setText(contextInfo.getLastPolled().toString());
+    void displayContext(CollaboratorContext collaboratorContext){
+        if(collaboratorContext != null) {
+            this.selectedContext = collaboratorContext;
+            this.interactionsTable.setContext(collaboratorContext);
+            this.identifierLabel.setText(collaboratorContext.getIdentifier());
+            this.lastPolledLabel.setText(collaboratorContext.getLastPolled().toString());
         }else{
             this.selectedContext = null;
             this.interactionsTable.setContext(null);
@@ -88,7 +88,7 @@ class ContextInformationPanel extends JPanel {
             this.lastPolledLabel.setText("N/A");
         }
         this.interactionInformationPanel.setActiveInteraction(null);
-        pollNowButton.setEnabled(contextInfo != null);
+        pollNowButton.setEnabled(collaboratorContext != null);
     }
 
     private void registerListeners(){
@@ -102,10 +102,8 @@ class ContextInformationPanel extends JPanel {
         //Update last polled text when poll request sent
         this.contextManager.addEventListener(new CollaboratorEventAdapter() {
             @Override
-            public void onPollingRequestSent(String collaboratorServer, String contextIdentifier, boolean isFirstPoll) {
-                if(selectedContext != null
-                        && collaboratorServer.equalsIgnoreCase(selectedContext.getCollaboratorAddress())
-                        && contextIdentifier.equalsIgnoreCase(selectedContext.getIdentifier())){
+            public void onPollingRequestSent(CollaboratorContext collaboratorContext) {
+                if(selectedContext != null && selectedContext.equals(collaboratorContext)){
                     lastPolledLabel.setText(selectedContext.getLastPolled().toString());
                     lastPolledLabel.setForeground(Color.ORANGE);
 

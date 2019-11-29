@@ -1,6 +1,7 @@
 package com.nccgroup.collaboratorplusplus.extension.interactionhistory;
 
 import com.coreyd97.BurpExtenderUtilities.Preferences;
+import com.nccgroup.collaboratorplusplus.extension.context.CollaboratorContext;
 import com.nccgroup.collaboratorplusplus.extension.context.ContextManager;
 
 import javax.swing.*;
@@ -31,9 +32,13 @@ public class HistoryUI extends JSplitPane {
             if(selectedRow == -1) {
                 SwingUtilities.invokeLater(() -> contextInformationPanel.displayContext(null));
             }else{
-                String id = (String) contextTable.getValueAt(selectedRow, 0);
-                SwingUtilities.invokeLater(() ->
-                        contextInformationPanel.displayContext(contextManager.getCollaboratorContext(id)));
+                Object selectedComponent = contextTable.getPathForRow(selectedRow).getLastPathComponent();
+                if(selectedComponent instanceof CollaboratorContext) {
+                    SwingUtilities.invokeLater(() ->
+                            contextInformationPanel.displayContext((CollaboratorContext) selectedComponent));
+                }else{
+                    SwingUtilities.invokeLater(() -> contextInformationPanel.displayContext(null));
+                }
             }
         });
 

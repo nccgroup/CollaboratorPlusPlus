@@ -7,7 +7,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.nccgroup.collaboratorplusplus.extension.CollaboratorPlusPlus;
 import com.nccgroup.collaboratorplusplus.utilities.SelectableLabel;
-import org.bouncycastle.util.Arrays;
 import org.bouncycastle.util.encoders.Base64;
 
 import javax.swing.*;
@@ -26,7 +25,7 @@ public class SMTPInteraction extends Interaction{
         this(null, interaction, isSSL);
     }
 
-    protected SMTPInteraction(ContextInfo context, JsonObject interaction, boolean isSSL) {
+    protected SMTPInteraction(CollaboratorContext context, JsonObject interaction, boolean isSSL) {
         super(context, isSSL ? InteractionType.SMTPS : InteractionType.SMTP, interaction);
 
         //Parse SMTP specific properties here

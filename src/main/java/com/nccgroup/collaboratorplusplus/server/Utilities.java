@@ -1,5 +1,7 @@
 package com.nccgroup.collaboratorplusplus.server;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemReader;
 
@@ -19,9 +21,11 @@ import java.security.spec.PKCS8EncodedKeySpec;
 
 public class Utilities {
 
+    public static final Logger logger = LogManager.getLogger(Utilities.class);
+
     public static PrivateKey loadPrivateKeyFromFile(String path) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException {
         if(!Files.exists(Paths.get(path))){
-            System.err.println("Cannot load private key \"" + path + "\". File does not exist!");
+            logger.error("Cannot load private key \"" + path + "\". File does not exist!");
         }
         FileReader fileReader = new FileReader(path);
         PemObject pemObject = new PemReader(fileReader).readPemObject();
@@ -33,7 +37,7 @@ public class Utilities {
 
     public static Certificate loadCertificateFromFile(String path) throws IOException, CertificateException {
         if(!Files.exists(Paths.get(path))){
-            System.err.println("Cannot load certificate \"" + path + "\". File does not exist!");
+            logger.error("Cannot load certificate \"" + path + "\". File does not exist!");
         }
         FileReader fileReader = new FileReader(path);
         PemObject pemObject = new PemReader(fileReader).readPemObject();

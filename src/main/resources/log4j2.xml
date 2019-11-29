@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN" packages="com.nccgroup.extension">
+    <Properties>
+        <Property name="log-path">log</Property>
+    </Properties>
+<!--    <Appenders>-->
+<!--        <Console name="console-log" target="SYSTEM_OUT">-->
+<!--            <PatternLayout pattern="[%-5level] %d{yyyy-MM-dd HH:mm:ss.SSS} %c{1} - %msg%n"/>-->
+<!--        </Console>-->
+<!--        <JTextAreaAppender name="jtextarea-log" maxLines="100">-->
+<!--            <PatternLayout>-->
+<!--                <pattern>[%-5level] %d{yyyy-MM-dd HH:mm:ss} %msg%n</pattern>-->
+<!--            </PatternLayout>-->
+<!--        </JTextAreaAppender>-->
+<!--    </Appenders>-->
+    <Loggers>
+<!--        <Logger name="My Logger" level="debug" additivity="false">-->
+<!--            <appender-ref ref="console-log" level="debug"/>-->
+<!--            <appender-ref ref="jtextarea-log" level="debug"/>-->
+<!--        </Logger>-->
+        <Root level="debug" additivity="false">
+        </Root>
+    </Loggers>
+</Configuration>

@@ -26,10 +26,12 @@ dependencies {
     compile 'com.github.CoreyD97:BurpExtenderUtilities:8b5b654ac4d07fb6fcc8f0ae3a9c34ce553d7ea6'
     compile 'net.portswigger.burp.extender:burp-extender-api:1.7.22'
     compile 'com.google.code.gson:gson:+'
+    compile 'org.apache.logging.log4j:log4j-core:2.12.1'
     compile group: 'org.apache.httpcomponents', name: 'httpclient', version: '4.5.10'
     compile group: 'commons-io', name: 'commons-io', version: '2.4'
     compile group: 'nu.studer', name: 'java-ordered-properties', version: '1.0.1'
     compile group: 'org.bouncycastle', name: 'bcprov-jdk15on', version: '1.62'
+    compile group: 'org.swinglabs', name: 'swingx', version: '1.6.1'
     testCompile files('/opt/BurpSuitePro/burpsuite_pro.jar')
 }
 

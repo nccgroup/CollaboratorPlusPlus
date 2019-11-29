@@ -1,8 +1,5 @@
 package com.nccgroup.collaboratorplusplus.extension.context;
 
-import burp.IMessageEditor;
-import burp.IMessageEditorController;
-import burp.IRequestInfo;
 import com.coreyd97.BurpExtenderUtilities.Alignment;
 import com.coreyd97.BurpExtenderUtilities.PanelBuilder;
 import com.google.gson.JsonObject;
@@ -24,7 +21,7 @@ public class HTTPInteraction extends Interaction{
         this(null, interaction, isHttps);
     }
 
-    protected HTTPInteraction(ContextInfo context, JsonObject interaction, boolean isHttps) {
+    protected HTTPInteraction(CollaboratorContext context, JsonObject interaction, boolean isHttps) {
         super(context, isHttps ? InteractionType.HTTPS : InteractionType.HTTP, interaction);
 
         //Parse HTTP specific properties here
@@ -54,8 +51,8 @@ public class HTTPInteraction extends Interaction{
 
     private URL buildInteractionURL() {
         try {
-            return new URL(this.interactionType.toString(),
-                    this.interactionString + (this.context != null ? this.context.collaboratorAddress : ""),
+            return new URL(this.interactionType.toString(), this.interactionString +
+                            (this.context != null ? this.context.getCollaboratorServer().getCollaboratorAddress() : ""),
                     this.interactionType == InteractionType.HTTPS ? 443 : 80, "");
         } catch (MalformedURLException e) {
             return null;

@@ -7,12 +7,10 @@ import com.google.gson.JsonObject;
 import com.nccgroup.collaboratorplusplus.extension.CollaboratorPlusPlus;
 import com.nccgroup.collaboratorplusplus.extension.DNSQueryType;
 import com.nccgroup.collaboratorplusplus.utilities.SelectableLabel;
-import com.nccgroup.collaboratorplusplus.utilities.StaticHTTPMessageController;
 import org.bouncycastle.util.encoders.Base64;
 
 import javax.swing.*;
 import java.awt.*;
-import java.net.URL;
 
 public class DNSInteraction extends Interaction {
 
@@ -24,7 +22,7 @@ public class DNSInteraction extends Interaction {
         this(null, interaction);
     }
 
-    DNSInteraction(ContextInfo context, JsonObject interaction){
+    DNSInteraction(CollaboratorContext context, JsonObject interaction){
         super(context, InteractionType.DNS, interaction);
 
         //Parse DNS specific properties here

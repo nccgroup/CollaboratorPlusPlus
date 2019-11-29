@@ -5,12 +5,19 @@ import burp.IBurpExtenderCallbacks;
 import burp.IExtensionStateListener;
 import com.coreyd97.BurpExtenderUtilities.DefaultGsonProvider;
 import com.coreyd97.BurpExtenderUtilities.Preferences;
+import com.nccgroup.collaboratorplusplus.extension.context.CollaboratorContext;
 import com.nccgroup.collaboratorplusplus.extension.context.ContextManager;
 import com.nccgroup.collaboratorplusplus.extension.context.Interaction;
 import com.nccgroup.collaboratorplusplus.extension.ui.ExtensionUI;
-import com.nccgroup.collaboratorplusplus.utilities.LogManager;
 import org.apache.http.HttpHost;
 import org.apache.http.impl.bootstrap.HttpServer;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.config.Configuration;
+import org.apache.logging.log4j.core.config.Configurator;
+import org.apache.logging.log4j.core.layout.PatternLayout;
 
 import javax.swing.*;
 import java.awt.*;
@@ -25,7 +32,7 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
 
     //Vars
     public static IBurpExtenderCallbacks callbacks;
-    public static LogManager logManager;
+    public static Logger logger = LogManager.getLogger(CollaboratorPlusPlus.class);
     private ProxyService proxyService;
     private ContextManager contextManager;
     private Preferences preferences;
@@ -33,8 +40,6 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
 
     private ExtensionUI ui;
     private BurpTabController burpTabController;
-
-    private HttpServer oldServer;
 
     public CollaboratorPlusPlus(){
         //Fix Darcula's issue with JSpinner UI.
@@ -50,28 +55,43 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
 
     @Override
     public void registerExtenderCallbacks(IBurpExtenderCallbacks callbacks) {
-
         CollaboratorPlusPlus.callbacks = callbacks;
-        CollaboratorPlusPlus.logManager = new LogManager();
         proxyServiceListeners = new ArrayList<>();
 
         //Setup preferences
         DefaultGsonProvider gsonProvider = new DefaultGsonProvider();
         this.preferences = new CollaboratorPreferenceFactory(gsonProvider, callbacks).buildPreferences();
         this.contextManager = new ContextManager(this);
-        logManager.setLogLevel(this.preferences.getSetting(PREF_LOG_LEVEL));
+
+        //Setup logger
+        Configuration config = ((LoggerContext) LogManager.getContext(false)).getConfiguration();
+        PatternLayout logLayout = PatternLayout.newBuilder()
+                .withConfiguration(config)
+                .withPattern("[%-5level] %d{yyyy-MM-dd HH:mm:ss} %msg%n")
+                .build();
+        JTextAreaAppender textAreaAppender = JTextAreaAppender.createAppender("JTextAreaAppender", 500,
+                false, logLayout, null);
+        textAreaAppender.start();
+        config.addAppender(textAreaAppender);
+        config.getRootLogger().addAppender(textAreaAppender, Level.ALL, null);
+
+        //Load log level from preferences
+        Level logLevel = preferences.getSetting(PREF_LOG_LEVEL);
+        Configurator.setRootLevel(logLevel);
+
 
         //Clean up proxy service on startup failure and color tab when running/stopped
         this.addProxyServiceListener(new ProxyServiceAdapter() {
 
             @Override
             public void onStartupSuccess(String message) {
+                logger.info("Local authentication proxy started!");
                 burpTabController.setTabColor(Color.GREEN);
-                oldServer = proxyService.getServer();
             }
 
             @Override
             public void onStartupFail(String message) {
+                logger.info("Failed to start the local authentication proxy, Reason: " + message);
                 shutdownProxyService();
             }
 
@@ -84,12 +104,12 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
         //Color tab orange if errors, green if working correctly.
         this.contextManager.addEventListener(new CollaboratorEventAdapter() {
             @Override
-            public void onPollingResponseReceived(String collaboratorServer, String contextIdentifier, ArrayList<Interaction> interactions) {
+            public void onPollingResponseReceived(CollaboratorContext collaboratorContext, ArrayList<Interaction> interactions) {
                 burpTabController.setTabColor(Color.GREEN);
             }
 
             @Override
-            public void onPollingFailure(String collaboratorServer, String contextIdentifier, String error) {
+            public void onPollingFailure(CollaboratorContext collaboratorContext, String error) {
                 burpTabController.setTabColor(Color.ORANGE);
             }
         });
@@ -138,7 +158,7 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
 
         String collaboratorAddress = preferences.getSetting(PREF_COLLABORATOR_ADDRESS);
         if(preferences.getSetting(PREF_POLLING_ADDRESS).equals("")){
-            logManager.logInfo("Polling location was not configured. Defaulting to the Collaborator address.");
+            logger.info("Polling location was not configured. Defaulting to the Collaborator address.");
             preferences.setSetting(PREF_POLLING_ADDRESS, collaboratorAddress);
         }
 
@@ -215,7 +235,7 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
     public void shutdownProxyService(){
         if(!isProxyServiceRunning()) throw new IllegalStateException("The proxy service is not running.");
         proxyService.stop();
-        logManager.logInfo("Proxy Service Stopped...");
+        logger.info("Proxy Service Stopped...");
         for (IProxyServiceListener proxyServiceListener : proxyServiceListeners) {
             proxyServiceListener.onShutdown();
         }
@@ -251,10 +271,6 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
 
     public Preferences getPreferences() {
         return this.preferences;
-    }
-
-    public LogManager getLogController() {
-        return logManager;
     }
 
     public ContextManager getContextManager() {

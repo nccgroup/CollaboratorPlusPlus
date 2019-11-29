@@ -5,12 +5,11 @@ import com.coreyd97.BurpExtenderUtilities.IGsonProvider;
 import com.coreyd97.BurpExtenderUtilities.PreferenceFactory;
 import com.coreyd97.BurpExtenderUtilities.Preferences;
 import com.google.gson.reflect.TypeToken;
-import com.nccgroup.collaboratorplusplus.extension.context.ContextInfo;
-import com.nccgroup.collaboratorplusplus.extension.context.Interaction;
-import com.nccgroup.collaboratorplusplus.extension.context.InteractionSerializer;
-import com.nccgroup.collaboratorplusplus.utilities.LogManager;
+import com.nccgroup.collaboratorplusplus.extension.context.*;
+import com.nccgroup.collaboratorplusplus.utilities.LevelSerializer;
+import org.apache.logging.log4j.Level;
 
-import java.util.HashMap;
+import java.util.ArrayList;
 
 import static com.nccgroup.collaboratorplusplus.extension.Globals.*;
 
@@ -28,11 +27,14 @@ public class CollaboratorPreferenceFactory extends PreferenceFactory {
     @Override
     protected void registerTypeAdapters() {
         gsonProvider.registerTypeAdapter(Interaction.class, new InteractionSerializer());
+//        gsonProvider.registerTypeAdapter(CollaboratorContext.class, new CollaboratorContextSerializer());
+        gsonProvider.registerTypeAdapter(CollaboratorServer.class, new CollaboratorServerSerializer());
+        gsonProvider.registerTypeAdapter(Level.class, new LevelSerializer());
     }
 
     @Override
     protected void registerSettings() {
-        prefs.registerSetting(PREF_LOG_LEVEL, LogManager.LogLevel.class, LogManager.LogLevel.INFO, Preferences.Visibility.GLOBAL);
+        prefs.registerSetting(PREF_LOG_LEVEL, Level.class, Level.INFO, Preferences.Visibility.GLOBAL);
         prefs.registerSetting(PREF_COLLABORATOR_ADDRESS, String.class, "burpcollaborator.net", Preferences.Visibility.GLOBAL);
         prefs.registerSetting(PREF_POLLING_ADDRESS, String.class, "polling.burpcollaborator.net", Preferences.Visibility.GLOBAL);
         prefs.registerSetting(PREF_POLLING_PORT, Integer.class, 443, Preferences.Visibility.GLOBAL);
@@ -46,6 +48,6 @@ public class CollaboratorPreferenceFactory extends PreferenceFactory {
         prefs.registerSetting(PREF_USE_AUTHENTICATION, Boolean.class, false, Preferences.Visibility.GLOBAL);
         prefs.registerSetting(PREF_AUTO_START, Boolean.class, false, Preferences.Visibility.GLOBAL);
         prefs.registerSetting(PREF_ORIGINAL_COLLABORATOR_SETTINGS, String.class, "", Preferences.Visibility.PROJECT);
-        prefs.registerSetting(PREF_COLLABORATOR_HISTORY, new TypeToken<HashMap<String, ContextInfo>>(){}.getType(), new HashMap<>(), Preferences.Visibility.PROJECT);
+        prefs.registerSetting(PREF_COLLABORATOR_HISTORY, new TypeToken<ArrayList<CollaboratorServer>>(){}.getType(), new ArrayList<>(), Preferences.Visibility.PROJECT);
     }
 }

@@ -2,14 +2,10 @@ package com.nccgroup.collaboratorplusplus.extension.context;
 
 import com.coreyd97.BurpExtenderUtilities.Alignment;
 import com.coreyd97.BurpExtenderUtilities.PanelBuilder;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.nccgroup.collaboratorplusplus.utilities.SelectableLabel;
 
 import javax.swing.*;
-import java.net.URL;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.UUID;
 
@@ -18,7 +14,7 @@ public abstract class Interaction {
 
     private final UUID identifier;
     protected InteractionType interactionType;
-    protected transient ContextInfo context;
+    protected transient CollaboratorContext context;
     protected String interactionString;
     protected long time;
     protected String client;
@@ -30,7 +26,7 @@ public abstract class Interaction {
         this.identifier = UUID.randomUUID();
     }
 
-    protected Interaction(ContextInfo context, InteractionType type, JsonObject interaction){
+    protected Interaction(CollaboratorContext context, InteractionType type, JsonObject interaction){
         this();
         this.interactionType = type;
         this.context = context;
@@ -69,7 +65,8 @@ public abstract class Interaction {
     }
 
     public String getInteractionStringWithDomain(){
-        if(this.context != null) return String.format("%s.%s", this.interactionString, context.getCollaboratorAddress());
+        if(this.context != null) return String.format("%s.%s", this.interactionString,
+                context.getCollaboratorServer().getCollaboratorAddress());
         else return this.interactionString;
     }
 
@@ -92,13 +89,13 @@ public abstract class Interaction {
         }, Alignment.TOPLEFT, 1.0, 0.0);
     }
 
-    public static Interaction parseFromJson(ContextInfo contextInfo, JsonObject json){
+    public static Interaction parseFromJson(CollaboratorContext collaboratorContext, JsonObject json){
         switch(json.getAsJsonObject().get("protocol").getAsString().toUpperCase()){
-            case "DNS": return new DNSInteraction(contextInfo, json);
-            case "HTTP": return new HTTPInteraction(contextInfo, json, false);
-            case "HTTPS": return new HTTPInteraction(contextInfo, json, true);
-            case "SMTP": return new SMTPInteraction(contextInfo, json, false);
-            case "SMTPS": return new SMTPInteraction(contextInfo, json, true);
+            case "DNS": return new DNSInteraction(collaboratorContext, json);
+            case "HTTP": return new HTTPInteraction(collaboratorContext, json, false);
+            case "HTTPS": return new HTTPInteraction(collaboratorContext, json, true);
+            case "SMTP": return new SMTPInteraction(collaboratorContext, json, false);
+            case "SMTPS": return new SMTPInteraction(collaboratorContext, json, true);
         }
         return null;
     }

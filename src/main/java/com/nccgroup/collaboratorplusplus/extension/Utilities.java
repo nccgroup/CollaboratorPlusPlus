@@ -1,23 +1,25 @@
 package com.nccgroup.collaboratorplusplus.extension;
 
-import burp.IBurpExtenderCallbacks;
 import com.coreyd97.BurpExtenderUtilities.Preferences;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.nccgroup.collaboratorplusplus.extension.context.ContextInfo;
+import com.nccgroup.collaboratorplusplus.extension.context.CollaboratorContext;
 import com.nccgroup.collaboratorplusplus.extension.context.Interaction;
 import org.apache.http.HttpHost;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.net.Inet4Address;
 import java.util.ArrayList;
 
-import static com.nccgroup.collaboratorplusplus.extension.CollaboratorPlusPlus.logManager;
 import static com.nccgroup.collaboratorplusplus.extension.CollaboratorPlusPlus.callbacks;
 import static com.nccgroup.collaboratorplusplus.extension.Globals.*;
 
 public class Utilities {
+
+    private static final Logger logger = LogManager.getLogger(Utilities.class);
 
     public static ArrayList<Interaction> parseInteractions(JsonObject collaboratorResponse){
         ArrayList<Interaction> interactions = new ArrayList<>();
@@ -41,10 +43,10 @@ public class Utilities {
         return json;
     }
 
-    public static ArrayList<Interaction> parseInteractions(ContextInfo contextInfo, JsonArray jsonArray){
+    public static ArrayList<Interaction> parseInteractions(CollaboratorContext collaboratorContext, JsonArray jsonArray){
         ArrayList<Interaction> interactions = new ArrayList<>();
         for (JsonElement jsonElement : jsonArray) {
-            Interaction interaction = Interaction.parseFromJson(contextInfo, jsonElement.getAsJsonObject());
+            Interaction interaction = Interaction.parseFromJson(collaboratorContext, jsonElement.getAsJsonObject());
             if(interaction != null) interactions.add(interaction);
         }
         return interactions;
@@ -92,22 +94,22 @@ public class Utilities {
                     if(ip.equalsIgnoreCase("127.0.0.1")){
                         //Existing entry, just make sure its enabled.
                         if(enabled){
-                            logManager.logInfo("Sink for public collaborator server already exists, continuing...");
+                            logger.info("Sink for public collaborator server already exists, continuing...");
                         }else {
-                            logManager.logInfo("Enabling sink for public collaborator server.");
+                            logger.info("Enabling sink for public collaborator server.");
                             resolutionElement.getAsJsonObject().addProperty("enabled", true);
                         }
                         shouldAddEntry = false;
                     }else{
                         //Not our entry,
-                        logManager.logInfo("Hostname resolution entry exists for public collaborator server. Disabling and adding sink entry.");
+                        logger.info("Hostname resolution entry exists for public collaborator server. Disabling and adding sink entry.");
                         resolutionElement.getAsJsonObject().addProperty("enabled", false);
                     }
                     break;
                 }
             }
         }else{
-            logManager.logInfo("Adding DNS sink for the public collaborator server: \"burpcollaborator.net\" .");
+            logger.info("Adding DNS sink for the public collaborator server: \"burpcollaborator.net\" .");
         }
         if(shouldAddEntry){
             resolutionElements.add(buildPublicCollaboratorSink());
@@ -128,7 +130,7 @@ public class Utilities {
             Boolean enabled = resolutionElement.getAsJsonObject().get("enabled").getAsBoolean();
             if(hostname.equalsIgnoreCase(PUBLIC_COLLABORATOR_HOSTNAME) && ip.equalsIgnoreCase("127.0.0.1")){
                 resolutionElement.getAsJsonObject().addProperty("enabled", false);
-                logManager.logInfo("Disabled sink for public collaborator server.");
+                logger.info("Disabled sink for public collaborator server.");
                 break;
             }
         }

@@ -3,6 +3,9 @@ package com.nccgroup.collaboratorplusplus.extension;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonSyntaxException;
+import com.google.gson.stream.MalformedJsonException;
+import com.nccgroup.collaboratorplusplus.extension.context.CollaboratorContext;
 import com.nccgroup.collaboratorplusplus.extension.context.ContextManager;
 import com.nccgroup.collaboratorplusplus.extension.context.Interaction;
 import com.nccgroup.collaboratorplusplus.extension.exception.*;
@@ -29,17 +32,20 @@ import org.apache.http.protocol.HttpRequestHandler;
 import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.http.ssl.TrustStrategy;
 import org.apache.http.util.EntityUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLHandshakeException;
 import java.io.IOException;
 import java.net.*;
-import java.security.*;
+import java.security.GeneralSecurityException;
+import java.security.KeyManagementException;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.concurrent.TimeUnit;
-
-import static com.nccgroup.collaboratorplusplus.extension.CollaboratorPlusPlus.logManager;
 
 public class ProxyService implements HttpRequestHandler {
 
@@ -55,6 +61,8 @@ public class ProxyService implements HttpRequestHandler {
     private String sessionKey;
     private HttpServer server;
     private URI forwardingURI;
+
+    private Logger logger = LogManager.getLogger(ProxyService.class);
 
     ProxyService(ContextManager contextManager, ArrayList<IProxyServiceListener> listeners,
                  String collaboratorAddress, Integer listenPort, URI forwardingURI, boolean useAuthentication,
@@ -86,18 +94,18 @@ public class ProxyService implements HttpRequestHandler {
 
         serverBootstrap.setExceptionLogger(ex -> {
             if(!(ex instanceof SocketException) && !(ex instanceof ConnectionClosedException)){
-                logManager.logError("Uncaught Exception...");
-                logManager.logError(ex.getMessage());
-                logManager.logDebug(ex);
+                logger.error("Uncaught Exception...");
+                logger.error(ex.getMessage());
+                logger.debug(ex);
             }
         });
 
         server = serverBootstrap.create();
         assert server != null;
         try {
-            logManager.logInfo("Server Started...");
+            logger.info("Server Started...");
             server.start();
-            logManager.logInfo("Testing connection to collaborator instance.");
+            logger.info("Testing connection to collaborator instance.");
             requestInteractionsForContext("test");
             handleStartupSuccess("Server Started.");
         }catch (Exception e){
@@ -116,7 +124,7 @@ public class ProxyService implements HttpRequestHandler {
 
     private CloseableHttpClient buildHttpClient(boolean ignoreCertificateErrors, boolean verifyHostname, HttpHost proxyAddress)
             throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
-        logManager.logDebug("Creating HTTP Client...");
+        logger.debug("Creating HTTP Client...");
         HttpClientBuilder httpClientBuilder =
                 HttpClients.custom().setSSLContext(createSSLContext(ignoreCertificateErrors))
                         .setSSLHostnameVerifier(verifyHostname ? new DefaultHostnameVerifier() : NoopHostnameVerifier.INSTANCE)
@@ -124,7 +132,7 @@ public class ProxyService implements HttpRequestHandler {
                         .setDefaultRequestConfig(RequestConfig.custom().setConnectTimeout(5000).build()); //Don't hang around!
 
         if(proxyAddress != null){
-            logManager.logDebug("Setting Client Proxy to: " + proxyAddress);
+            logger.debug("Setting Client Proxy to: " + proxyAddress);
             httpClientBuilder.setProxy(proxyAddress);
         }
 
@@ -148,12 +156,20 @@ public class ProxyService implements HttpRequestHandler {
         try {
             client = buildHttpClient(this.ignoreCertificateErrors, this.hostnameVerification, this.proxyAddress);
         } catch (NoSuchAlgorithmException | KeyStoreException | KeyManagementException e) {
-            logManager.logError("Could not create HTTP client, " + e.getMessage());
-            logManager.logDebug(e);
+            logger.error("Could not create HTTP client, " + e.getMessage());
+            logger.debug(e);
             throw new CollaboratorPollingException(e.getMessage());
         }
-        logManager.logDebug("HTTP Client Created: " + client);
+        logger.debug("HTTP Client Created: " + client);
         return client;
+    }
+
+    public ArrayList<Interaction> requestInteractionsForContext(CollaboratorContext context) throws CollaboratorPollingException {
+        if(context.getCollaboratorServer().getCollaboratorAddress().equalsIgnoreCase(this.collaboratorAddress)){
+            return requestInteractionsForContext(context.getIdentifier());
+        }else{
+            throw new CollaboratorPollingException("Collaborator++ is not currently targeting this collaborator server.\nPoint Collaborator++ to the correct server and try again.");
+        }
     }
 
     public ArrayList<Interaction> requestInteractionsForContext(String contextIdentifier) throws CollaboratorPollingException {
@@ -161,7 +177,8 @@ public class ProxyService implements HttpRequestHandler {
         try {
             return requestInteractionsForContext(client, contextIdentifier).getInteractions();
         }catch (CollaboratorPollingException e){
-            this.contextManager.pollingFailure(collaboratorAddress, contextIdentifier, e.getMessage());
+            if(!contextIdentifier.equalsIgnoreCase("test"))
+                this.contextManager.pollingFailure(collaboratorAddress, contextIdentifier, e.getMessage());
             throw e;
         } finally {
             if (client != null) {
@@ -178,7 +195,7 @@ public class ProxyService implements HttpRequestHandler {
         HttpHost host = new HttpHost(forwardingURI.getHost(), forwardingURI.getPort(), forwardingURI.getScheme());
         HttpRequest clientRequest;
         String pollingRequestUri = "/burpresults?biid=" + URLEncoder.encode(contextIdentifier);
-        logManager.logInfo("Requesting interactions from server for identifier: " + contextIdentifier);
+        logger.info("Requesting interactions from server for identifier: " + contextIdentifier);
 
 
         String responseString = null;
@@ -198,16 +215,20 @@ public class ProxyService implements HttpRequestHandler {
                 this.contextManager.pollingRequestSent(this.collaboratorAddress, contextIdentifier);
 
             //Make the request
-            logManager.logDebug("Sending Request.. " + clientRequest);
+            logger.info("Sending Request.. " + clientRequest);
             collaboratorServerResponse = httpClient.execute(host, clientRequest);
             final int statusCode = collaboratorServerResponse.getStatusLine().getStatusCode();
             boolean isAuthServer = collaboratorServerResponse.getFirstHeader("X-Auth-Compatible") != null;
-            logManager.logDebug("Received response: Status " + statusCode + ", " + collaboratorServerResponse.getEntity());
+            logger.debug("Received response: Status " + statusCode + ", " + collaboratorServerResponse.getEntity());
 
-            if (collaboratorServerResponse.getFirstHeader("X-Collaborator-Version") == null) {
-                logManager.logDebug("Server Response: " + EntityUtils.toString(collaboratorServerResponse.getEntity()));
-                throw new InvalidResponseException("Not a valid collaborator response! Are we definitely targeting a Collaborator server?");
-            }
+//            if (collaboratorServerResponse.getFirstHeader("X-Collaborator-Version") == null) {
+//                logger.debug("Server Response: " + EntityUtils.toString(collaboratorServerResponse.getEntity()));
+//                if (isAuthServer) {
+//                    throw new InvalidResponseException("The collaborator server requires authentication.");
+//                }else{
+//                    throw new InvalidResponseException("Not a valid collaborator response! Are we definitely targeting a Collaborator server?");
+//                }
+//            }
 
 
             if (isAuthServer ^ useAuthentication) {
@@ -219,11 +240,13 @@ public class ProxyService implements HttpRequestHandler {
                 throw new AuthenticationException(responseString);
             } else {
                 if (!useAuthentication || statusCode == HttpStatus.SC_UNAUTHORIZED) {
-                    // Either we're not targeting the authentication server or
-                    // the server could not decrypt our request. Secret is probably incorrect!
-                    logManager.logDebug("Plaintext Response Received: " + responseString);
+                    //If we're not using authentication,
+                    // or we were using auth and the server responded with a 401, the response will be plaintext.
                     responseString = EntityUtils.toString(collaboratorServerResponse.getEntity());
-                    throw new InvalidSecretException(responseString);
+                    logger.debug("Plaintext Response Received: " + responseString);
+                    if(statusCode == HttpStatus.SC_UNAUTHORIZED) {
+                        throw new InvalidSecretException(responseString);
+                    }
                 } else {
                     //The response should have been encrypted.
                     byte[] responseBytes = EntityUtils.toByteArray(collaboratorServerResponse.getEntity());
@@ -237,13 +260,18 @@ public class ProxyService implements HttpRequestHandler {
                     }
 
                     responseString = Encryption.aesDecryptRequest(this.sessionKey, responseBytes);
-                    logManager.logDebug("Decrypted Response: " + responseString);
+                    logger.debug("Decrypted Response: " + responseString);
                 }
 
                 if (statusCode == HttpStatus.SC_OK) {
-                    JsonObject interactionsJson = JsonParser.parseString(responseString).getAsJsonObject();
+                    JsonObject interactionsJson;
+                    try {
+                        interactionsJson = JsonParser.parseString(responseString).getAsJsonObject();
+                    }catch (JsonSyntaxException e){
+                        throw new InvalidResponseException("The server did not respond with valid JSON.");
+                    }
                     ArrayList<Interaction> interactions = Utilities.parseInteractions(interactionsJson);
-                    logManager.logInfo(String.format("%d interaction%s retrieved.", interactions.size(),
+                    logger.info(String.format("%d interaction%s retrieved.", interactions.size(),
                             interactions.size() > 0 ? "s" : ""));
 
                     if (!contextIdentifier.equalsIgnoreCase("test")) {
@@ -265,13 +293,13 @@ public class ProxyService implements HttpRequestHandler {
                         ? e.getMessage()
                         : "SSL exception. Check you're targetting the correct protocol and the server is configured correctly.";
             }
-            logManager.logDebug(e);
+            logger.debug(e);
             throw new CollaboratorSSLException(responseString);
         }catch (GeneralSecurityException | IOException e) {
-            logManager.logDebug(e);
+            logger.debug(e);
             throw new CollaboratorPollingException(e.getMessage());
         } catch (CollaboratorPollingException e){
-            logManager.logDebug(e);
+            logger.debug(e);
             throw e;
         }
     }
@@ -312,15 +340,15 @@ public class ProxyService implements HttpRequestHandler {
 
             return;
         }catch (Exception e){
-            logManager.logError(e.getMessage());
-            logManager.logDebug(e);
+            logger.error(e.getMessage());
+            logger.debug(e);
             responseString = e.getMessage();
         }
 
         this.contextManager.pollingFailure(collaboratorAddress, contextIdentifier, responseString);
 
         forwardedResponse.setStatusCode(500);
-        logManager.logInfo("Could not retrieve interactions: " + responseString);
+        logger.info("Could not retrieve interactions: " + responseString);
     }
 
     private void buildAuthenticatedRequest(HttpPost clientRequest, String pollingRequestUri) throws GeneralSecurityException {
