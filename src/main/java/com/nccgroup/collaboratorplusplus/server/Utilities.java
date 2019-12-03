@@ -1,5 +1,6 @@
 package com.nccgroup.collaboratorplusplus.server;
 
+import com.nccgroup.collaboratorplusplus.extension.Globals;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.bouncycastle.util.io.pem.PemObject;
@@ -21,7 +22,7 @@ import java.security.spec.PKCS8EncodedKeySpec;
 
 public class Utilities {
 
-    public static final Logger logger = LogManager.getLogger(Utilities.class);
+    public static final Logger logger = LogManager.getLogger(Globals.EXTENSION_NAME);
 
     public static PrivateKey loadPrivateKeyFromFile(String path) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException {
         if(!Files.exists(Paths.get(path))){

@@ -19,7 +19,7 @@ import static com.nccgroup.collaboratorplusplus.extension.Globals.*;
 
 public class Utilities {
 
-    private static final Logger logger = LogManager.getLogger(Utilities.class);
+    private static final Logger logger = LogManager.getLogger(Globals.EXTENSION_NAME);
 
     public static ArrayList<Interaction> parseInteractions(JsonObject collaboratorResponse){
         ArrayList<Interaction> interactions = new ArrayList<>();

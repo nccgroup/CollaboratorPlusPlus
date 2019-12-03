@@ -1,5 +1,6 @@
 package com.nccgroup.collaboratorplusplus.server;
 
+import com.nccgroup.collaboratorplusplus.extension.Globals;
 import com.nccgroup.collaboratorplusplus.utilities.Encryption;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.*;
@@ -34,7 +35,7 @@ import java.util.Base64;
 
 public class HttpHandler implements HttpRequestHandler {
 
-    private static Logger logger = LogManager.getLogger(HttpHandler.class);
+    private static Logger logger = LogManager.getLogger(Globals.EXTENSION_NAME);
     private final String actualAddress;
     private final Integer actualPort;
     private final boolean actualIsHttps;

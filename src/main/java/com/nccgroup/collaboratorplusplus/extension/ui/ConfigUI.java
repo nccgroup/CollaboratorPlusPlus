@@ -36,7 +36,7 @@ public class ConfigUI extends JPanel implements LogListener, IProxyServiceListen
     private JLabel statusLabel;
     private JTextArea logArea;
 
-    private final static org.apache.logging.log4j.Logger logger = LogManager.getLogger(ConfigUI.class);
+    private final static org.apache.logging.log4j.Logger logger = LogManager.getLogger(Globals.EXTENSION_NAME);
 
     public ConfigUI(CollaboratorPlusPlus extension){
         this.setLayout(new BorderLayout());
@@ -179,7 +179,8 @@ public class ConfigUI extends JPanel implements LogListener, IProxyServiceListen
         logLevelSelector.addActionListener(e -> {
             Level selectedLevel = (Level) logLevelSelector.getSelectedItem();
             extension.getPreferences().setSetting(PREF_LOG_LEVEL, selectedLevel);
-            Configurator.setRootLevel(selectedLevel);
+            ((LoggerContext) LogManager.getContext(false))
+                    .getLogger(EXTENSION_NAME).setLevel(selectedLevel);
         });
         logLevelPanel.add(new JLabel("Log Level: "));
         logLevelPanel.add(logLevelSelector);

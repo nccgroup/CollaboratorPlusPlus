@@ -15,8 +15,10 @@ import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.config.AppenderRef;
 import org.apache.logging.log4j.core.config.Configuration;
 import org.apache.logging.log4j.core.config.Configurator;
+import org.apache.logging.log4j.core.config.LoggerConfig;
 import org.apache.logging.log4j.core.layout.PatternLayout;
 
 import javax.swing.*;
@@ -32,7 +34,7 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
 
     //Vars
     public static IBurpExtenderCallbacks callbacks;
-    public static Logger logger = LogManager.getLogger(CollaboratorPlusPlus.class);
+    public static Logger logger;
     private ProxyService proxyService;
     private ContextManager contextManager;
     private Preferences preferences;
@@ -63,8 +65,12 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
         this.preferences = new CollaboratorPreferenceFactory(gsonProvider, callbacks).buildPreferences();
         this.contextManager = new ContextManager(this);
 
+        //Load log level from preferences
+        Level logLevel = preferences.getSetting(PREF_LOG_LEVEL);
+
         //Setup logger
-        Configuration config = ((LoggerContext) LogManager.getContext(false)).getConfiguration();
+        LoggerContext context = (LoggerContext) LogManager.getContext(false);
+        Configuration config = context.getConfiguration();
         PatternLayout logLayout = PatternLayout.newBuilder()
                 .withConfiguration(config)
                 .withPattern("[%-5level] %d{yyyy-MM-dd HH:mm:ss} %msg%n")
@@ -73,12 +79,17 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
                 false, logLayout, null);
         textAreaAppender.start();
         config.addAppender(textAreaAppender);
-        config.getRootLogger().addAppender(textAreaAppender, Level.ALL, null);
 
-        //Load log level from preferences
-        Level logLevel = preferences.getSetting(PREF_LOG_LEVEL);
-        Configurator.setRootLevel(logLevel);
+        AppenderRef[] appenderRefs = new AppenderRef[]{
+                AppenderRef.createAppenderRef("JTextAreaAppender", null, null)
+        };
+        LoggerConfig loggerConfig = LoggerConfig.createLogger(false, logLevel, "CollaboratorPlusPlus", "true",
+                appenderRefs, null, config, null);
+        loggerConfig.addAppender(textAreaAppender, null, null);
+        config.addLogger(EXTENSION_NAME, loggerConfig);
+        context.updateLoggers();
 
+        logger = LogManager.getLogger(EXTENSION_NAME);
 
         //Clean up proxy service on startup failure and color tab when running/stopped
         this.addProxyServiceListener(new ProxyServiceAdapter() {

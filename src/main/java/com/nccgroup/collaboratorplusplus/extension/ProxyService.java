@@ -62,7 +62,7 @@ public class ProxyService implements HttpRequestHandler {
     private HttpServer server;
     private URI forwardingURI;
 
-    private Logger logger = LogManager.getLogger(ProxyService.class);
+    private Logger logger = LogManager.getLogger(Globals.EXTENSION_NAME);
 
     ProxyService(ContextManager contextManager, ArrayList<IProxyServiceListener> listeners,
                  String collaboratorAddress, Integer listenPort, URI forwardingURI, boolean useAuthentication,
