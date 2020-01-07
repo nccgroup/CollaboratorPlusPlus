@@ -83,6 +83,7 @@ public class Utilities {
                                              .getAsJsonObject("connections")
                                              .getAsJsonArray("hostname_resolution");
 
+        boolean resolutionElementsModified = false;
         boolean shouldAddEntry = true;
         if(resolutionElements.size() > 0){
             for (JsonElement resolutionElement : resolutionElements) {
@@ -98,6 +99,7 @@ public class Utilities {
                         }else {
                             logger.info("Enabling sink for public collaborator server.");
                             resolutionElement.getAsJsonObject().addProperty("enabled", true);
+                            resolutionElementsModified = true;
                         }
                         shouldAddEntry = false;
                     }else{
@@ -113,6 +115,9 @@ public class Utilities {
         }
         if(shouldAddEntry){
             resolutionElements.add(buildPublicCollaboratorSink());
+            resolutionElementsModified = true;
+        }
+        if(resolutionElementsModified){
             callbacks.loadConfigFromJson(config.toString());
         }
     }
