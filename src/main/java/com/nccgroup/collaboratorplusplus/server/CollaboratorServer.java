@@ -147,17 +147,6 @@ public class CollaboratorServer {
 
     public static void main(String[] args) throws Exception {
 
-        //Setup Logging
-        Configuration logConfig = ((LoggerContext) LogManager.getContext(false)).getConfiguration();
-        PatternLayout logLayout = PatternLayout.newBuilder()
-                .withConfiguration(logConfig)
-                .withPattern("[%-5level] %d{yyyy-MM-dd HH:mm:ss} %msg%n")
-                .build();
-        ConsoleAppender consoleAppender = ConsoleAppender.createDefaultAppenderForLayout(logLayout);
-        consoleAppender.start();
-        logConfig.addAppender(consoleAppender);
-        logConfig.getRootLogger().addAppender(consoleAppender, Level.ALL, null);
-
         OrderedProperties properties = getDefaultProperties();
         if(args.length == 0){
             //Create default properties file
