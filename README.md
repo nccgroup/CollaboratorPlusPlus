@@ -1,5 +1,6 @@
 ## CollaboratorPlusPlus
 
+Download from releases [here](https://github.com/nccgroup/CollaboratorPlusPlus/releases).
 
 ##### Background
 This tool aims to extend upon the existing Collaborator functionality provided by Burp Suite, providing a 
