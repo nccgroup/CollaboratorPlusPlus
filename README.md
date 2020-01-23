@@ -1,4 +1,12 @@
 ## CollaboratorPlusPlus
+Released as open source by NCC Group Plc - http://www.nccgroup.com/
+
+Developed by Corey Arthur, corey.arthur@nccgroup.com
+
+http://www.github.com/nccgroup/CollaboratorPlusPlus
+
+This project is released under AGPL see LICENSE for more information
+
 
 Download from releases [here](https://github.com/nccgroup/CollaboratorPlusPlus/releases).
 
