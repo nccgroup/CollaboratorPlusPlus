@@ -1,21 +1,17 @@
-## Collaborator Authenticator
+## CollaboratorPlusPlus
 
 
 ##### Background
-By searching Shodan.io for response headers sent by Burp Collaborator, 
-NCC Group discovered the existence of 364 private collaborator servers. 
-160 of these were configured with SSL certificates, many of which with 
-common name attributes suggesting ownership by leading security companies. 
+This tool aims to extend upon the existing Collaborator functionality provided by Burp Suite, providing a 
+number of quality of life features, and the implementation of an authentication mechanism to secure private collaborator
+deployments, while still being compatible with all existing extensions which generate and poll Collaborator contexts. 
 
-Since Collaborator does not provide an authentication mechanism, a malicious user may 
-use any of these discovered servers to exfiltrate stolen data from a compromised network by
-simply configuring Burp to use one of the discovered collaborator servers, generating a 
-collaborator address and making a request from the victim network with the stolen data
-contained within a POST request. 
+CollaboratorPlusPlus acts as a proxy between Burp and the configured Collaborator server, allowing the capture
+of Collaborator contexts being used by the client. CollaboratorPlusPlus can then store and display the observed contexts
+and their retrieved interactions in a central interface. In addition, old contexts can be polled manually, allowing
+interactions to be retrieved even after the Collaborator client window has been closed.
 
-This tool aims to secure Collaborator servers by providing an authenticated proxy for polling 
-for Collaborator interactions, enabling server owners to limit unauthenticated 
-polling to the local network.
+![Context List](images/ContextList.png)
 
 ##### Authentication Mechanism
 
@@ -32,7 +28,7 @@ to retrieve the interactions for the given Collaborator instance. The response i
 encrypted with the shared-secret before being sent back to the Burp client.
  
 By using the shared-secret to encrypt the transmission between the Burp client and the authentication server,
-the shared-secret does not need to be transmitted along with the request. This allows confidentiality to be
+the shared-secret does not need to be transmitted along with the request, allowing confidentiality to be
 maintained even in cases where HTTP communication must be used between the client and server. 
 
 
