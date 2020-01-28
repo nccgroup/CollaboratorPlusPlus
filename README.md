@@ -24,10 +24,9 @@ interactions to be retrieved even after the Collaborator client window has been 
 
 ##### Authentication Mechanism
 
-Collaborator++ consists of two components, the server-side authentication server 
-which is responsible for validating incoming polling requests before passing them to the 
-Collaborator server, and the client extension which creates a local HTTP server and 
-sets itself as the polling address. 
+In addition to the Burp Extension, the Collaborator++ project also includes a server-side authentication component 
+which is responsible for validating and authenticating incoming polling requests before passing them to the 
+Collaborator server. This can be deployed by owners of private Burp Collaborator servers to restrict polling to only those with knowledge of the shared secret.
 
 When Burp requests the list of interactions received by the Collaborator server, the extension 
 encrypts the polling requests with the AES256-CBC encryption scheme, using the shared secret 
@@ -47,7 +46,7 @@ maintained even in cases where HTTP communication must be used between the clien
 1. Add the extension to Burp
     - Note: This is the same JAR as the server.
 2. Specify the address and the port the Collaborator Server is listening on within the extension config.
-3. Optional: If you are connecting to a Collaborator Auth server, specify the shared secret and enable authentication in Collaborator++.
+3. Optional: If you are using to a Collaborator Auth server, specify the shared secret and enable authentication in the extension config.
 4. Start the local server, this will also configure the collaborator settings within Burp for you.
 5. Optional: Run Burp's Collaborator health check to make sure everything is working.
 
@@ -72,13 +71,13 @@ Adds a DNS entry for *"burpcollaborator.net"* to *127.0.0.1* in Burp's hostname 
 ## Collaborator Auth - Server
 
 ##### Running the Server
-1. Execute `java -jar CollaboratorAuth.jar` to generate the default configuration.
+1. Execute `java -jar CollaboratorPlusPlus.jar` to generate the default configuration.
     - Note: This is the same JAR as the client.
 2. Edit the generated file to point to your private collaborator instance and choose a suitable secret.
-3. Run the server again and specify the configuration to be used `java -jar CollaboratorAuth-SERVER.jar YOURCONFIGFILE.properties`
+3. Run the server again and specify the configuration to be used `java -jar CollaboratorPlusPlus.jar YOURCONFIGFILE.properties`
 
-*Note: To allow HTTP and HTTPS requests to the Collaborator Auth server, create two copies of the configuration file, 
-configuring one for HTTP and one for HTTPS and run two instances of the Collaborator Auth server.*
+*Note: To allow HTTP and HTTPS requests to the Collaborator++ Auth server, create two copies of the configuration file, 
+configuring one for HTTP and one for HTTPS and run two instances of the Collaborator++ Auth server.*
 
 ##### SSL Configuration
 
