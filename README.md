@@ -24,9 +24,8 @@ interactions to be retrieved even after the Collaborator client window has been 
 
 ##### Authentication Mechanism
 
-In addition to the Burp Extension, the Collaborator++ project also includes a server-side authentication component 
-which is responsible for validating and authenticating incoming polling requests before passing them to the 
-Collaborator server. This can be deployed by owners of private Burp Collaborator servers to restrict polling to only those with knowledge of the shared secret.
+In addition to the Burp Extension, the Collaborator++ project also includes an optional server-side authentication component 
+to authenticating incoming polling requests before passing them to the Collaborator server. This can be deployed by owners of private Burp Collaborator servers to restrict polling to only those with knowledge of the shared secret.
 
 When Burp requests the list of interactions received by the Collaborator server, the extension 
 encrypts the polling requests with the AES256-CBC encryption scheme, using the shared secret 
