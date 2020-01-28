@@ -97,7 +97,7 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
             @Override
             public void onStartupSuccess(String message) {
                 logger.info("Local authentication proxy started!");
-                burpTabController.setTabColor(Color.GREEN);
+                SwingUtilities.invokeLater(() -> burpTabController.setTabColor(new Color(60, 146, 38)));
             }
 
             @Override
@@ -108,7 +108,13 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
 
             @Override
             public void onShutdown() {
-                burpTabController.setTabColor(Color.RED);
+                SwingUtilities.invokeLater(() -> {
+                    if(UIManager.getLookAndFeel().getName().equalsIgnoreCase("darcula")) {
+                        burpTabController.setTabColor(new Color(212, 60, 55));
+                    }else{
+                        burpTabController.setTabColor(new Color(220, 10, 19));
+                    }
+                });
             }
         });
 
@@ -116,12 +122,12 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
         this.contextManager.addEventListener(new CollaboratorEventAdapter() {
             @Override
             public void onPollingResponseReceived(CollaboratorContext collaboratorContext, ArrayList<Interaction> interactions) {
-                burpTabController.setTabColor(Color.GREEN);
+                SwingUtilities.invokeLater(() -> burpTabController.setTabColor(new Color(60, 146, 38)));
             }
 
             @Override
             public void onPollingFailure(CollaboratorContext collaboratorContext, String error) {
-                burpTabController.setTabColor(Color.ORANGE);
+                SwingUtilities.invokeLater(() -> burpTabController.setTabColor(Color.ORANGE));
             }
         });
 
@@ -138,7 +144,11 @@ public class CollaboratorPlusPlus implements IBurpExtender, IExtensionStateListe
             this.burpTabController = new BurpTabController(burpTabbedPane, this.ui.getUiComponent(), null, null);
 
             //Start off the tab as red, until we've started up.
-            burpTabController.setTabColor(Color.RED);
+            if(UIManager.getLookAndFeel().getName().equalsIgnoreCase("darcula")) {
+                burpTabController.setTabColor(new Color(212, 60, 55));
+            }else{
+                burpTabController.setTabColor(new Color(220, 10, 19));
+            }
 
             this.ui.addMenuItemsToBurp();
             if(this.preferences.getSetting(PREF_AUTO_START)){

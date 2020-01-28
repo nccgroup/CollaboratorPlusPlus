@@ -18,7 +18,7 @@ import java.net.URISyntaxException;
 
 import static com.nccgroup.collaboratorplusplus.extension.Globals.*;
 
-public class ConfigUI extends JPanel implements LogListener, IProxyServiceListener {
+public class ConfigUI extends JPanel implements IProxyServiceListener {
 
     private final CollaboratorPlusPlus extension;
     private JToggleButton startStopButton;
@@ -35,8 +35,6 @@ public class ConfigUI extends JPanel implements LogListener, IProxyServiceListen
     private JTextArea secretArea;
     private JLabel statusLabel;
     private JTextArea logArea;
-
-    private final static org.apache.logging.log4j.Logger logger = LogManager.getLogger(Globals.EXTENSION_NAME);
 
     public ConfigUI(CollaboratorPlusPlus extension){
         this.setLayout(new BorderLayout());
@@ -221,51 +219,59 @@ public class ConfigUI extends JPanel implements LogListener, IProxyServiceListen
 
     @Override
     public void beforeStartup() {
-        startStopButton.setText("Starting...");
-        startStopButton.setEnabled(false);
-        startStopButton.setSelected(true);
+        SwingUtilities.invokeLater(() -> {
+            startStopButton.setText("Starting...");
+            startStopButton.setEnabled(false);
+            startStopButton.setSelected(true);
 
-        //Disable all other controls
-        enableControls(false);
+            //Disable all other controls
+            enableControls(false);
+        });
     }
 
     @Override
     public void onStartupFail(String message) {
-        startStopButton.setText("Start");
-        startStopButton.setSelected(false);
-        startStopButton.setEnabled(true);
+        SwingUtilities.invokeLater(() -> {
+            startStopButton.setText("Start");
+            startStopButton.setSelected(false);
+            startStopButton.setEnabled(true);
 
-        //Enable all other controls
-        enableControls(true);
+            //Enable all other controls
+            enableControls(true);
 
-        statusLabel.setText("Status: Not Running");
+            statusLabel.setText("Status: Not Running");
+        });
     }
 
     @Override
     public void onStartupSuccess(String message) {
-        startStopButton.setText("Stop");
-        startStopButton.setSelected(true);
-        statusLabel.setText("Status: Listening on port " + localPortSpinner.getValue());
+        SwingUtilities.invokeLater(() -> {
+            startStopButton.setText("Stop");
+            startStopButton.setSelected(true);
+            statusLabel.setText("Status: Listening on port " + localPortSpinner.getValue());
 
-        //Disable all other controls
-        enableControls(false);
-        startStopButton.setEnabled(true);
-        this.revalidate();
-        this.repaint();
+            //Disable all other controls
+            enableControls(false);
+            startStopButton.setEnabled(true);
+            this.revalidate();
+            this.repaint();
+        });
     }
 
     @Override
     public void onShutdown() {
-        statusLabel.setText("Status: Not Running");
+        SwingUtilities.invokeLater(() -> {
+            statusLabel.setText("Status: Not Running");
 
-        //Reenable other controls
-        //Disable all other controls
-        enableControls(true);
-        startStopButton.setEnabled(true);
-        startStopButton.setSelected(false);
-        startStopButton.setText("Start");
-        this.revalidate();
-        this.repaint();
+            //Reenable other controls
+            //Disable all other controls
+            enableControls(true);
+            startStopButton.setEnabled(true);
+            startStopButton.setSelected(false);
+            startStopButton.setText("Start");
+            this.revalidate();
+            this.repaint();
+        });
     }
 
     private void enableControls(boolean enabled){
@@ -280,28 +286,5 @@ public class ConfigUI extends JPanel implements LogListener, IProxyServiceListen
         proxyRequestsWithBurp.setEnabled(enabled);
         enableAuthentication.setEnabled(enabled);
         secretArea.setEnabled(enabled && enableAuthentication.isSelected());
-    }
-    
-    @Override
-    public void onInfo(String message) {
-        if(logArea == null) return;
-        synchronized (logArea) {
-            logArea.append("INFO: " + message + "\n");
-        }
-    }
-
-    @Override
-    public void onError(String message) {
-        if(logArea == null) return;
-        synchronized (logArea) {
-            logArea.append("ERROR: " + message + "\n");
-        }
-    }
-
-    @Override
-    public void onDebug(String message) {
-        synchronized (logArea) {
-            logArea.append("DEBUG: " + message + "\n");
-        }
     }
 }
