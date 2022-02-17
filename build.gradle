@@ -3,8 +3,9 @@ plugins {
 }
 
 group 'nccgroup'
-version '0.3.0-Beta'
+version '1.0.2'
 sourceCompatibility = 1.8
+targetCompatibility = 1.8
 
 
 repositories {
@@ -17,11 +18,6 @@ repositories {
     }
 }
 
-configurations {
-    includeUnexplodedLib
-    compile.extendsFrom includeUnexplodedLib
-}
-
 dependencies {
     compile 'com.github.CoreyD97:BurpExtenderUtilities:8b5b654ac4d07fb6fcc8f0ae3a9c34ce553d7ea6'
     compile 'net.portswigger.burp.extender:burp-extender-api:1.7.22'
@@ -32,7 +28,7 @@ dependencies {
     compile group: 'nu.studer', name: 'java-ordered-properties', version: '1.0.4'
     compile group: 'org.bouncycastle', name: 'bcprov-jdk15on', version: '1.62'
     compile group: 'org.swinglabs', name: 'swingx', version: '1.6.1'
-    testCompile files('/opt/BurpSuitePro/burpsuite_pro.jar')
+    testRuntime files('/home/corey/BurpSuiteCommunity/burpsuite_community.jar')
 }
 
 tasks.withType(Jar){
